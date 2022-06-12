@@ -20,8 +20,8 @@ class Attention(nn.Module):
         # |w| = (batch_size, m, n)
         if mask is not None:
             assert w.size() == mask.size()
-            # mask를 -float('inf')로 만들어두니 overflow 문제 발생, 0으로 변경
-            w.masked_fill_(mask, 0)
+            # mask를 -float('inf')로 만들어두니 overflow 문제 발생
+            w.masked_fill_(mask, -1e8)
 
         w = self.softmax(w / (dk**.5)) #attention값
         c = torch.bmm(w, V) #attention값과 Value값 행렬곱
