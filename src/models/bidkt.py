@@ -16,10 +16,12 @@ class Attention(nn.Module):
 
         # w = attention energy
         w = torch.bmm(Q, K.transpose(1, 2))
+
         # |w| = (batch_size, m, n)
         if mask is not None:
             assert w.size() == mask.size()
-            w.masked_fill_(mask, -float('inf')) #마스크 씌우기
+            # mask를 -float('inf')로 만들어두니 overflow 문제 발생, 0으로 변경
+            w.masked_fill_(mask, 0)
 
         w = self.softmax(w / (dk**.5)) #attention값
         c = torch.bmm(w, V) #attention값과 Value값 행렬곱
@@ -45,12 +47,8 @@ class MultiHead(nn.Module):
         self.attn = Attention()
 
     def forward(self, Q, K, V, mask=None):
-        # 각 multihead의 위치에 따라 입력값들의 차원이 달라지게 됨
-        # 따라서 각 차원이 들어오더라도 대응할 수 있도록 코드를 짜야함
-        # |Q|    = (batch_size, m, hidden_size) m은 decoder의 time step 갯수
-        # |K|    = (batch_size, n, hidden_size) n은 encoder의 time step 갯수
-        # |V|    = |K|
-        # |mask| = (batch_size, m, n)
+        # |Q| = |K| = |V| = (bs, n, hs)
+        # |mask| = (bs, n, bs)
 
         # 마지막 차원을 split함, 그러면 QWs는 리스트형태로 쌓이게 됨
         QWs = self.Q_linear(Q).split(self.hidden_size // self.n_splits, dim=-1)
@@ -95,7 +93,7 @@ class EncoderBlock(nn.Module):
 
     def __init__(
         self,
-        hidden_size,
+        hidden_size, #512
         n_splits,
         dropout_p=.1,
     ):
@@ -107,23 +105,28 @@ class EncoderBlock(nn.Module):
 
         self.fc = nn.Sequential(
             nn.Linear(hidden_size, hidden_size * 4),
-            nn.ReLU(), #reaky relu
+            nn.LeakyReLU(),
             nn.Linear(hidden_size * 4, hidden_size),
         )
         self.fc_norm = nn.LayerNorm(hidden_size)
         self.fc_dropout = nn.Dropout(dropout_p)
 
     def forward(self, x, mask):
-        # |x|    = (bs, n, hs)
+        # |x| = (bs, n, emb_size), torch.float32
         # |mask| = (bs, n, n)
 
         # Pre-LN:
         z = self.attn_norm(x)
+        # |z| = (bs, n, emb_size)
+
         # x+ means redisual connection
         z = x + self.attn_dropout(self.attn(Q=z,
                                             K=z,
                                             V=z,
                                             mask=mask))
+        # |z| = (bs, n, hs)
+
+
         z = z + self.fc_dropout(self.fc(self.fc_norm(z)))
         # |z| = (bs, n, hs)
 
@@ -155,27 +158,29 @@ class Bidkt(nn.Module):
         num_head,
         num_encoder,
         max_seq_len,
+        device,
         dropout_p=.1,
     ):
-        self.num_q = num_q + 2 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요
-        self.num_r = num_r + 2 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요
+        self.num_q = num_q + 3 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
+        self.num_r = num_r + 3 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_head = num_head
         self.num_encoder = num_encoder
         self.max_seq_len = max_seq_len
+        self.device = device
         self.dropout_p = dropout_p
 
         super().__init__()
 
         # embedding
         # question embedding
-        self.emb_q = nn.Embedding(num_q, hidden_size)
+        self.emb_q = nn.Embedding(self.num_q, self.hidden_size).to(self.device)
         # response embedding
-        self.emb_r = nn.Embedding(num_r, hidden_size)
+        self.emb_r = nn.Embedding(self.num_r, self.hidden_size).to(self.device)
         # positional embedding
-        self.emb_p = nn.Embedding(max_seq_len, hidden_size)
-        self.emb_dropout = nn.Dropout(dropout_p)
+        self.emb_p = nn.Embedding(self.max_seq_len, self.hidden_size).to(self.device)
+        self.emb_dropout = nn.Dropout(self.dropout_p)
 
         # MySequential을 활용해 필요한만큼 encoder block을 만듦
         self.encoder = MySequential(
@@ -189,7 +194,7 @@ class Bidkt(nn.Module):
         self.generator = nn.Sequential(
             nn.LayerNorm(hidden_size), # Only for Pre-LN Transformer.
             nn.Linear(hidden_size, output_size),
-            nn.LogSoftmax(dim=-1),
+            nn.Sigmoid() # binary
         )
 
     # positional embedding
@@ -200,7 +205,7 @@ class Bidkt(nn.Module):
         seq_len = q.size(1)
         # seq_len = (n,)
 
-        pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q)
+        pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q).to(self.device)
         # |pos| = (bs, n)
 
         emb = self.emb_q(q) + self.emb_r(r) + self.emb_p(pos)
@@ -216,16 +221,21 @@ class Bidkt(nn.Module):
 
         # Mask to prevent having attention weight on padding position.
         with torch.no_grad():
-            mask_enc = mask.unsqueeze(1).expand(q.size(), mask.size(-1))
-            # |mask_enc| = (bs, n, n)
-        
-        z = self.emb_dropout(self._positional_embedding(q, r))
-        # |z| = (bs, n, hs)
+            mask_enc = mask.unsqueeze(-1).expand(mask.size(0), mask.size(1), mask.size(1)).bool()
+             # |mask_enc| = (bs, n, n)
 
+        emb = self._positional_embedding(q, r)
+        # |emb| = (bs, n, emb_size)
+        
+        z = self.emb_dropout(emb)
+        # |z| = (bs, n, emb_size)
+
+        # |mask_enc| = (bs, n, n)
+        # |z| = (bs, n, emb_size)
         z, _ = self.encoder(z, mask_enc)
         # |z| = (bs, n, hs)
 
         y_hat = self.generator(z)
-        # |y_hat| = (bs, n, output_size)
+        #|y_hat| = (bs, n, output_size=1)
 
         return y_hat

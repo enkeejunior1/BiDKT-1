@@ -25,8 +25,8 @@ def define_argparser():
     # bidkt's arguments
     p.add_argument('--max_seq_len', type=int, default=100)
     p.add_argument('--num_encoder', type=int, default=12)
-    p.add_argument('--hidden_size', type=int, default=512)
-    p.add_argument('--num_head', type=int, default=16) #hidden_size가 나누어지도록
+    p.add_argument('--hidden_size', type=int, default=512) #원래는 512
+    p.add_argument('--num_head', type=int, default=16) #원래는 16, hidden_size가 나누어지도록
     p.add_argument('--output_size', type=int, default=1) #정답일 확률값만 알면 되므로, 0~1사이의 값
     p.add_argument('--dropout_p', type=int, default=.1)
 

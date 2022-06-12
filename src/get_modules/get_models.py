@@ -11,6 +11,7 @@ def get_models(num_q, device, config):
             num_head=config.num_head,
             num_encoder=config.num_encoder,
             max_seq_len=config.max_seq_len,
+            device=device,
             dropout_p=config.dropout_p,
         ).to(device)
     else:
