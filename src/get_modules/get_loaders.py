@@ -14,6 +14,7 @@ def get_loaders(config):
 
     #2. unique한 question의 갯수(num_q) 받아오기
     num_q = dataset.num_q
+    num_r = dataset.num_r
 
     #3. train, test 사이즈 나누기
     train_size = int( len(dataset) * config.train_ratio)
@@ -33,8 +34,8 @@ def get_loaders(config):
     test_loader = DataLoader(
         test_dataset,
         batch_size = config.batch_size,
-        shuffle = True,
+        shuffle = False, #test
         collate_fn = collate_fn
     )
 
-    return train_loader, test_loader, num_q
+    return train_loader, test_loader, num_q, num_r

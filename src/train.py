@@ -13,10 +13,10 @@ def main(config):
     device = torch.device('cpu') if config.gpu_id < 0 else torch.device('cuda:%d' % config.gpu_id)
     
     #1. 데이터 받아오기
-    train_loader, test_loader, num_q = get_loaders(config)
+    train_loader, test_loader, num_q, num_r = get_loaders(config)
 
     #2. model 선택
-    model = get_models(num_q, device, config)
+    model = get_models(num_q, num_r, device, config)
     
     #3. optimizer 선택
     optimizer = get_optimizers(model, config)

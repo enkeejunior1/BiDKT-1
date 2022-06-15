@@ -1,11 +1,11 @@
 from models.bidkt import Bidkt
 
-def get_models(num_q, device, config):
+def get_models(num_q, num_r, device, config):
 
     if config.model_name == "bidkt":
         model = Bidkt(
             num_q=num_q,
-            num_r=2, # 0과 1 이므로
+            num_r=num_r,
             hidden_size=config.hidden_size,
             output_size=config.output_size,
             num_head=config.num_head,

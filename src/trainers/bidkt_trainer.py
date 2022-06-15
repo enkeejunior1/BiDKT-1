@@ -7,50 +7,48 @@ import numpy as np
 from tqdm import tqdm
 from random import random, randint
 
-# 15%에 <MASK> 적용
+# Mask 새로 만들기
 def Mlm4BertTrain(r_seqs, mask_seqs):
-    # |r_seqs| = (bs, n)
-    
+    #|r_seqs| = (bs, n)
+
+    # r_seqs를 불러들인 후, for문으로 반복해서 불러들임
+    mlm_r_seqs = []
     mlm_idxs = []
 
-    # 그냥 pad 신경쓰지 말고, mask에 해당되는 곳을 랜덤으로 정하기
+    # 불러들인 r_seq를 대상으로 torch.masked_select()를 사용해서 길이를 자름
+    # PAD는 -1로 처리
     for r_seq, mask_seq in zip(r_seqs, mask_seqs):
-         # 중복되지 않는 인덱스의 수
         r_len = r_seq.size(0)
-        # |r_len| = (n, )
+        # real_r_seq: r_seq에 <PAD>를 제거한 sq
+        real_r_seq = torch.masked_select(r_seq, mask_seq).cpu()
+        real_r_seq_len = real_r_seq.size(0)
 
-        mask_len = mask_seq.sum()
-        # |mask_len| = (n, )
-
-        # 실제 r의 길이를 구함
-        r_seq_len = r_len - mask_len
-        # |r_seq_len| = (n, )
-
-        r_seq_len = r_seq_len.cpu()
-
-        # 실제 r의 길이인 r_seq_len의 15%에 해당하는 index 추출
-        mlm_idx = np.random.choice(r_seq_len, int(r_seq_len*0.15), replace=False)
-        # |mlm_idx| = (n, ), default = (15, )
+        mlm_idx = np.random.choice(real_r_seq_len, int(real_r_seq_len*0.15), replace=False)
 
         for idx in mlm_idx:
             if random() < 0.8: # 15% 중 80%는 <MASK>
-                r_seq[idx] = 2 # <MASK>는 2로 표시하기
+                real_r_seq[idx] = 2 # <MASK>는 2로 표시하기
             elif random() < 0.5: # 15% 중 10%는 0과 1의 random 값으로 넣기
-                r_seq[idx] = randint(0, 1)
+                real_r_seq[idx] = randint(0, 1)
             # 15% 중 10%는 원래 값 그대로
 
-        # mask 만들기
+        # pad_r_seq에 PAD(-1)을 씌움
+        pad_len = r_len - real_r_seq_len
+        pad_seq = torch.full((1, pad_len), -1).squeeze(0) #-1로 채우기
+        # 패드 다시 결합
+        pad_r_seq = torch.cat((real_r_seq, pad_seq), dim=-1)
+        # mlm_r_seqs에 넣기
+        mlm_r_seqs.append(pad_r_seq)
+
+        # <mask> idx bool 만들기
         # r_len의 길이(전체 길이)만큼 zero vector로 만듦
         mlm_zeros = np.zeros(shape=(r_len, ))
         # mlm_idx에 해당하는 곳에 1을 넣음
         mlm_zeros[mlm_idx] = 1
         # mlm_idxs에 값을 더함
         mlm_idxs.append(mlm_zeros)
-        
-    # 명시적으로 변수 선언
-    mlm_r_seqs = r_seqs
-    # mlm_idxs를 np.array로 바꾸고, bool type으로 변경(이후 mask를 씌우기 위해)
 
+    mlm_r_seqs = torch.stack(mlm_r_seqs)
     mlm_idxs = torch.BoolTensor(mlm_idxs)
 
     # mlm_r_seqs: mask가 씌워진 r_seqs
@@ -59,6 +57,7 @@ def Mlm4BertTrain(r_seqs, mask_seqs):
     # |mlm_r_seqs| = (bs, n)
     # |mask_seqs| = (bs, n)
 
+# 수정필요
 # real_r_seqs 마지막에 <MASK>
 def Mlm4BertTest(r_seqs, mask_seqs):
     #|r_seqs| = (bs, n)
@@ -112,7 +111,7 @@ class BidktTrainer():
 
         for data in tqdm(train_loader):
             self.model.train()
-            q_seqs, r_seqs, _, _, mask_seqs = data
+            q_seqs, r_seqs, mask_seqs = data
 
             q_seqs = q_seqs.to(self.device) #|q_seqs| = (bs, n)
             r_seqs = r_seqs.to(self.device) #|r_seqs| = (bs, n)
@@ -128,6 +127,9 @@ class BidktTrainer():
 
             mlm_r_seqs = mlm_r_seqs.to(self.device)
             mlm_idxs = mlm_idxs.to(self.device)
+
+            # zero_grad
+            self.optimizer.zero_grad()
 
             y_hat = self.model(
                 q_seqs.long(), 
@@ -145,7 +147,6 @@ class BidktTrainer():
             correct = torch.masked_select(real_seqs, mlm_idxs)
             #|correct| = (bs * n - n_mlm_idxs)
 
-            self.optimizer.zero_grad()
             #self.crit은 binary_cross_entropy
             loss = self.crit(y_hat, correct)
             # |loss| = (1)
@@ -170,7 +171,7 @@ class BidktTrainer():
         with torch.no_grad():
             for data in tqdm(test_loader):
                 self.model.eval()
-                q_seqs, r_seqs, _, _, mask_seqs = data #collate에 정의된 데이터가 나옴
+                q_seqs, r_seqs, mask_seqs = data #collate에 정의된 데이터가 나옴
                 #|r_seqs| = (bs, sq)
                 
                 q_seqs = q_seqs.to(self.device)

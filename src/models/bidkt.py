@@ -122,10 +122,9 @@ class EncoderBlock(nn.Module):
         # x+ means redisual connection
         z = x + self.attn_dropout(self.attn(Q=z,
                                             K=z,
-                                            V=z,
+                                            V=z, 
                                             mask=mask))
         # |z| = (bs, n, hs)
-
 
         z = z + self.fc_dropout(self.fc(self.fc_norm(z)))
         # |z| = (bs, n, hs)
@@ -161,8 +160,8 @@ class Bidkt(nn.Module):
         device,
         dropout_p=.1,
     ):
-        self.num_q = num_q + 3 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
-        self.num_r = num_r + 3 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
+        self.num_q = num_q + 4 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
+        self.num_r = num_r + 4 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_head = num_head
@@ -212,7 +211,6 @@ class Bidkt(nn.Module):
         # |emb| = (bs, n, hs)
 
         return emb
-
 
     def forward(self, q, r, mask):
         # |q| = (bs, n)
