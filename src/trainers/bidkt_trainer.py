@@ -34,7 +34,8 @@ def Mlm4BertTrain(r_seqs, mask_seqs):
 
         # pad_r_seq에 PAD(-1)을 씌움
         pad_len = r_len - real_r_seq_len
-        pad_seq = torch.full((1, pad_len), -1).squeeze(0) #-1로 채우기
+        # <PAD>를 3으로 채우기, -1로 채우면 embedding에서 error 발생
+        pad_seq = torch.full((1, pad_len), 3).squeeze(0) 
         # 패드 다시 결합
         pad_r_seq = torch.cat((real_r_seq, pad_seq), dim=-1)
         # mlm_r_seqs에 넣기
@@ -62,31 +63,30 @@ def Mlm4BertTrain(r_seqs, mask_seqs):
 def Mlm4BertTest(r_seqs, mask_seqs):
     #|r_seqs| = (bs, n)
 
+    mlm_r_seqs = []
     mlm_idxs = []
 
     for r_seq, mask_seq in zip(r_seqs, mask_seqs):
-        # mask_seqs를 통해 <PAD>가 아닌 mask 길이를 알아내기
-        
         r_len = r_seq.size(0)
-        # |r_len| = (n, )
 
-        mask_len = torch.sum(mask_seq)
-        # |mask_len| = (n, )
+        real_r_seq = torch.masked_select(r_seq, mask_seq).cpu()
+        real_r_seq_len = real_r_seq.size(0)
 
-        # r_seqs의 실제값의 마지막 인덱스
-        mlm_idx = r_len - mask_len - 1
+        #여기서는 real_r_seq의 마지막
+        mlm_idx = real_r_seq_len - 1
+        #마지막 index에 <MASK>를 씌움, <MASK>는 2
+        real_r_seq[mlm_idx] = 2
 
-        # r_seqs의 실제값의 마지막 인덱스를 2(<MASK>)로 바꿔줌
-        r_seq[mlm_idx] = 2
+        pad_len = r_len - real_r_seq_len
+        pad_seq = torch.full((1, pad_len), 3).squeeze(0) # <PAD>는 3
+        pad_r_seq = torch.cat((real_r_seq, pad_seq), dim=-1)
+        mlm_r_seqs.append(pad_r_seq)
 
-        # mask를 위한 bool tensor 만들기
         mlm_zeros = np.zeros(shape=(r_len, ))
         mlm_zeros[mlm_idx] = 1
         mlm_idxs.append(mlm_zeros)
-        
-    # 명시적으로 보이도록 변수명 변경
-    mlm_r_seqs = r_seqs
-    # boolTensor로 변경
+
+    mlm_r_seqs = torch.stack(mlm_r_seqs)
     mlm_idxs = torch.BoolTensor(mlm_idxs)
 
     return mlm_r_seqs, mlm_idxs
