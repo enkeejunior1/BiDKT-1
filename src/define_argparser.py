@@ -21,7 +21,6 @@ def define_argparser():
     p.add_argument('--dataset_name', type=str, default = 'assist2015')
     p.add_argument('--crit', type=str, default = 'binary_cross_entropy')
 
-    # models' special arguments
     # bidkt's arguments
     p.add_argument('--max_seq_len', type=int, default=100)
     p.add_argument('--num_encoder', type=int, default=12)

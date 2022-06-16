@@ -4,7 +4,7 @@ import torch
 from get_modules.get_loaders import get_loaders
 from get_modules.get_models import get_models
 from get_modules.get_trainers import get_trainers
-from utils import get_optimizers, get_crits, recoder
+from utils import get_optimizers, get_crits, recorder
 
 from define_argparser import define_argparser
 
@@ -29,12 +29,11 @@ def main(config):
 
     #6. 훈련 및 score 계산
     y_true_record, y_score_record, \
+        train_auc_scores, test_auc_scores, \
         highest_auc_score = trainer.train(train_loader, test_loader)
 
     #7. model 기록 저장 위치
-    #각 모델별로 따로 기록 저장하도록 폴더 만들어서 관리하기
-    #파일 이름에 auc기록과 시간이 자동으로 기록되도록 넣기
-    model_path = '../model_records/' + config.model_fn
+    model_path = '../model_records/' + str(round(highest_auc_score, 6)) + "_" + config.model_fn
 
     #8. model 기록
     torch.save({
@@ -42,10 +41,14 @@ def main(config):
         'config': config
     }, model_path)
 
-    return highest_auc_score
+    return train_auc_scores, test_auc_scores, highest_auc_score
 
 #main
 if __name__ == "__main__":
     config = define_argparser() #define_argparser를 불러옴
 
-    highest_auc_score = main(config)
+    train_auc_scores, test_auc_scores, highest_auc_score = main(config)
+    # 기록, utils에 있음
+    recorder(train_auc_scores, test_auc_scores, highest_auc_score, config)
+
+    

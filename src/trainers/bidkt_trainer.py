@@ -211,11 +211,13 @@ class BidktTrainer():
     def train(self, train_loader, test_loader):
         
         highest_auc_score = 0
+        train_auc_scores = []
+        test_auc_scores = []
         best_model = None
         #시각화를 위해 받아오기
         y_true_record, y_score_record = [], []
 
-        for epoch_index in range(self.n_epochs):
+        for idx, epoch_index in enumerate(range(self.n_epochs)):
             
             print("Epoch(%d/%d) start" % (
                 epoch_index + 1,
@@ -224,6 +226,10 @@ class BidktTrainer():
 
             train_auc_score = self._train(train_loader)
             test_auc_score, y_trues, y_scores = self._test(test_loader)
+
+            # train, test record 저장
+            train_auc_scores.append([idx + 1, train_auc_score])
+            test_auc_scores.append([test_auc_score])
 
             if test_auc_score >= highest_auc_score:
                 highest_auc_score = test_auc_score
@@ -247,4 +253,6 @@ class BidktTrainer():
         # 가장 최고의 모델 복구    
         self.model.load_state_dict(best_model)
 
-        return y_true_record, y_score_record, highest_auc_score
+        return y_true_record, y_score_record, \
+            train_auc_scores, test_auc_scores, \
+            highest_auc_score

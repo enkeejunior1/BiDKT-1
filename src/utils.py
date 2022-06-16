@@ -1,3 +1,7 @@
+import pandas as pd
+import numpy as np
+import json
+
 import torch
 from torch.nn.utils.rnn import pad_sequence
 
@@ -57,12 +61,22 @@ def get_crits(config):
     return crit
 
 #recoder
-def recoder(highest_auc_score, config):
-    #10. highest_auc_score 기록하기
-    #기록 위치는 ./records 안에 기록하기
-    #기록해야 할 하이퍼 파라미터
-    record_path = config.record_path
-    record_file = open(record_path, "a")
-    record_file.write("\t")
-    record_file.write(str(highest_auc_score))
-    record_file.write("\n")
+def recorder(train_auc_scores, test_auc_scores, highest_auc_score, config):
+
+    model_fn = config.model_fn
+
+    record_path = "../score_records/"
+
+    # config를 json파일로 저장
+    config_record_path = record_path + model_fn + "_config" + ".json"
+    config_dic = vars(config)
+    with open(config_record_path,'w') as f:
+        json.dump(config_dic,f)
+
+    # train, test auc와 highest_auc_socre를 csv로 저장
+    auc_record_path = record_path + model_fn + "_auc" + ".csv"
+    auc_scores = [train_auc + test_auc for train_auc, test_auc in zip(train_auc_scores, test_auc_scores)]
+    auc_scores.append(['hightest_auc', 0, highest_auc_score])
+    auc_df = pd.DataFrame(auc_scores, columns=['epochs', 'train_auc', 'test_auc'])
+    auc_df.set_index('epochs', inplace=True)
+    auc_df.to_csv(auc_record_path)
