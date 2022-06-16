@@ -1,4 +1,5 @@
 import numpy as np
+import datetime
 
 import torch
 from get_modules.get_loaders import get_loaders
@@ -32,8 +33,11 @@ def main(config):
         train_auc_scores, test_auc_scores, \
         highest_auc_score = trainer.train(train_loader, test_loader)
 
+    today = datetime.datetime.today()
+    record_time = str(today.month) + "_" + str(today.day) + "_" + str(today.hour) + "_" + str(today.minute)
+
     #7. model 기록 저장 위치
-    model_path = '../model_records/' + str(round(highest_auc_score, 6)) + "_" + config.model_fn
+    model_path = '../model_records/' + str(round(highest_auc_score, 6)) + "_" + record_time + "_" + config.model_fn
 
     #8. model 기록
     torch.save({
@@ -41,14 +45,14 @@ def main(config):
         'config': config
     }, model_path)
 
-    return train_auc_scores, test_auc_scores, highest_auc_score
+    return train_auc_scores, test_auc_scores, highest_auc_score, record_time
 
 #main
 if __name__ == "__main__":
     config = define_argparser() #define_argparser를 불러옴
 
-    train_auc_scores, test_auc_scores, highest_auc_score = main(config)
+    train_auc_scores, test_auc_scores, highest_auc_score, record_time = main(config)
     # 기록, utils에 있음
-    recorder(train_auc_scores, test_auc_scores, highest_auc_score, config)
+    recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, config)
 
     

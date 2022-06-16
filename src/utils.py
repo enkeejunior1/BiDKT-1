@@ -61,20 +61,20 @@ def get_crits(config):
     return crit
 
 #recoder
-def recorder(train_auc_scores, test_auc_scores, highest_auc_score, config):
+def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, config):
 
     model_fn = config.model_fn
 
     record_path = "../score_records/"
 
     # config를 json파일로 저장
-    config_record_path = record_path + model_fn + "_config" + ".json"
+    config_record_path = record_path + str(round(highest_auc_score, 6)) + "_" + record_time + "_" + model_fn + "_config" + ".json"
     config_dic = vars(config)
     with open(config_record_path,'w') as f:
-        json.dump(config_dic,f)
+        json.dump(config_dic, f)
 
     # train, test auc와 highest_auc_socre를 csv로 저장
-    auc_record_path = record_path + model_fn + "_auc" + ".csv"
+    auc_record_path = record_path + str(round(highest_auc_score, 6)) + "_" + model_fn + "_auc" + ".csv"
     auc_scores = [train_auc + test_auc for train_auc, test_auc in zip(train_auc_scores, test_auc_scores)]
     auc_scores.append(['hightest_auc', 0, highest_auc_score])
     auc_df = pd.DataFrame(auc_scores, columns=['epochs', 'train_auc', 'test_auc'])

@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from random import random, randint
 
-# Mask 새로 만들기
+# 15% <MASK>
 def Mlm4BertTrain(r_seqs, mask_seqs):
     #|r_seqs| = (bs, n)
 
@@ -58,8 +58,7 @@ def Mlm4BertTrain(r_seqs, mask_seqs):
     # |mlm_r_seqs| = (bs, n)
     # |mask_seqs| = (bs, n)
 
-# 수정필요
-# real_r_seqs 마지막에 <MASK>
+# seq의 가장 마지막에 <MASK>
 def Mlm4BertTest(r_seqs, mask_seqs):
     #|r_seqs| = (bs, n)
 

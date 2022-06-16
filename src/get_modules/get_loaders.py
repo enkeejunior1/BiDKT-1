@@ -1,14 +1,16 @@
 from torch.utils.data import DataLoader, random_split
 from utils import collate_fn
 from dataloaders.assist2015_loader import ASSIST2015
+from dataloaders.assist2009_loader import ASSIST2009
 
 #get_loaders를 따로 만들고, 이 함수를 train에서 불러내기
 def get_loaders(config):
 
     #1. dataset 선택
     if config.dataset_name == "assist2015":
-        # seq의 최대 길이를 전달
         dataset = ASSIST2015(config.max_seq_len)
+    elif config.dataset_name == "assist2009":
+        dataset = ASSIST2009(config.max_seq_len)
     else:
         print("Wrong dataset_name was used...")
 

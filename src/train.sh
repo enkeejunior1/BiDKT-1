@@ -1,16 +1,21 @@
 #!/bin/bash
 
-list=""
-model_name="bidkt"
+datasets="assist2015 assist2009"
+batchs="8 16 32 64"
+hidden_size="64 128 256 512"
 
-for num in ${list}
+for dataset in ${datasets}
 do
-    python \
-    train.py \
-    --model_fn model.pth \
-    --dataset_name coldstart1 \
-    --model_name ${model} \
-    --five_fold True \
-    --record_path ../records/coldstart1_record.tsv \
-    --n_epochs 100
+    for batch in ${batchs}
+    do
+        for hidden in ${hidden_size}
+        do
+            python \
+            train.py \
+            --model_fn model.pth \
+            --batch_size ${batch} \
+            --dataset_name ${dataset}
+            --n_epochs 100
+        done
+    done
 done
