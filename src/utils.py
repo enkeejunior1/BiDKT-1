@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import json
+import csv
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -61,22 +61,42 @@ def get_crits(config):
     return crit
 
 #recoder
+#깔끔하게 한장의 csv로 나오도록 바꿔보기
 def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, config):
 
-    model_fn = config.model_fn
+    dir_path = "../score_records/"
+    record_path = dir_path + "auc_record.csv"
 
-    record_path = "../score_records/"
+    #리스트에 모든 값 더해서 1줄로 만들기
+    append_list = []
 
-    # config를 json파일로 저장
-    config_record_path = record_path + str(round(highest_auc_score, 6)) + "_" + record_time + "_" + model_fn + "_config" + ".json"
-    config_dic = vars(config)
-    with open(config_record_path,'w') as f:
-        json.dump(config_dic, f)
+    append_list.append(record_time)
+    append_list.extend([
+        config.model_fn,
+        config.batch_size,
+        config.n_epochs,
+        config.learning_rate,
+        config.model_name,
+        config.optimizer,
+        config.dataset_name,
+        config.max_seq_len,
+        config.num_encoder,
+        config.hidden_size,
+        config.num_head,
+        config.dropout_p,
+        config.grad_acc,
+        config.grad_acc_iter
+    ])
+    append_list.extend(train_auc_scores)
+    append_list.extend(test_auc_scores)
+    append_list.append(highest_auc_score)
 
-    # train, test auc와 highest_auc_socre를 csv로 저장
-    auc_record_path = record_path + str(round(highest_auc_score, 6)) + "_" + model_fn + "_auc" + ".csv"
-    auc_scores = [train_auc + test_auc for train_auc, test_auc in zip(train_auc_scores, test_auc_scores)]
-    auc_scores.append(['hightest_auc', 0, highest_auc_score])
-    auc_df = pd.DataFrame(auc_scores, columns=['epochs', 'train_auc', 'test_auc'])
-    auc_df.set_index('epochs', inplace=True)
-    auc_df.to_csv(auc_record_path)
+
+    #csv파일 열어서 한줄 추가해주기
+    with open(record_path, 'a') as f:
+        wr = csv.writer(f)
+        wr.writerow(append_list)
+
+# visualizer도 여기에 하나 만들기
+def visualizer():
+    pass

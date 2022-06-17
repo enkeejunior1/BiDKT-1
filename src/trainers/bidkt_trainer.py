@@ -94,7 +94,18 @@ def Mlm4BertTest(r_seqs, mask_seqs):
 
 class BidktTrainer():
 
-    def __init__(self, model, optimizer, n_epochs, device, num_q, crit, max_seq_len):
+    def __init__(
+        self, 
+        model, 
+        optimizer, 
+        n_epochs, 
+        device, 
+        num_q, 
+        crit, 
+        max_seq_len, 
+        grad_acc=False, 
+        grad_acc_iter=4 #4면 기존 batch_size의 4배
+        ):
         self.model = model
         self.optimizer = optimizer
         self.n_epochs = n_epochs
@@ -102,13 +113,15 @@ class BidktTrainer():
         self.num_q = num_q
         self.crit = crit
         self.max_seq_len = max_seq_len
+        self.grad_acc = grad_acc #gradient accumulation
+        self.grad_acc_iter = grad_acc_iter
     
     def _train(self, train_loader):
 
         auc_score = 0
         y_trues, y_scores = [], []
 
-        for data in tqdm(train_loader):
+        for idx, data in enumerate(tqdm(train_loader)):
             self.model.train()
             q_seqs, r_seqs, mask_seqs = data
 
@@ -127,9 +140,8 @@ class BidktTrainer():
             mlm_r_seqs = mlm_r_seqs.to(self.device)
             mlm_idxs = mlm_idxs.to(self.device)
 
-            # zero_grad
-            self.optimizer.zero_grad()
-
+            # zero_grad(아래로 위치 변경)
+        
             y_hat = self.model(
                 q_seqs.long(), 
                 mlm_r_seqs.long(), # train을 위한 mlm된 r_seqs
@@ -149,8 +161,17 @@ class BidktTrainer():
             #self.crit은 binary_cross_entropy
             loss = self.crit(y_hat, correct)
             # |loss| = (1)
-            loss.backward()
-            self.optimizer.step()
+
+            #grad_accumulation
+            if self.grad_acc == True:
+                loss.backward()
+                if (idx + 1) % self.grad_acc_iter == 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+            else:
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
 
             y_trues.append(correct)
             y_scores.append(y_hat)
@@ -216,7 +237,7 @@ class BidktTrainer():
         #시각화를 위해 받아오기
         y_true_record, y_score_record = [], []
 
-        for idx, epoch_index in enumerate(range(self.n_epochs)):
+        for epoch_index in range(self.n_epochs):
             
             print("Epoch(%d/%d) start" % (
                 epoch_index + 1,
@@ -227,7 +248,7 @@ class BidktTrainer():
             test_auc_score, y_trues, y_scores = self._test(test_loader)
 
             # train, test record 저장
-            train_auc_scores.append([idx + 1, train_auc_score])
+            train_auc_scores.append([train_auc_score])
             test_auc_scores.append([test_auc_score])
 
             if test_auc_score >= highest_auc_score:

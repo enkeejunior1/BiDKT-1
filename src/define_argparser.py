@@ -29,6 +29,10 @@ def define_argparser():
     p.add_argument('--output_size', type=int, default=1) #정답일 확률값만 알면 되므로, 0~1사이의 값
     p.add_argument('--dropout_p', type=int, default=.1)
 
+    # grad_accumulation
+    p.add_argument('--grad_acc', type=bool, default=False)
+    p.add_argument('--grad_acc_iter', type=int, default=4)
+
     config = p.parse_args()
 
     return config
