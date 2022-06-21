@@ -1,3 +1,5 @@
+# KT-BERT
 
-<archtecture>
-https://drive.google.com/file/d/1UY4qj20DHPNzRCdBoLoMj94cemro7kg9/view?usp=sharing
+The this repo is about developing KT-BERT which is used BERT to knowledge tracing tasks.
+
+codingchild@korea.ac.kr
