@@ -60,6 +60,20 @@ def get_crits(config):
 
     return crit
 
+#score_lists는 이중리스트여야 함
+def get_average_scores(score_lists):
+
+    result_scores = []
+
+    for i in range(len(score_lists[0])):
+        result_score = []
+        for j in range(len(score_lists)):
+            result_score.append(score_lists[j][i])
+        result_score = sum(result_score) / len(result_score)
+        result_scores.append(result_score)
+
+    return result_scores
+
 #recoder
 #깔끔하게 한장의 csv로 나오도록 바꿔보기
 def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, config):
@@ -85,15 +99,18 @@ def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, 
         config.num_head,
         config.dropout_p,
         config.grad_acc,
-        config.grad_acc_iter
+        config.grad_acc_iter,
+        config.fivefold
     ])
+    append_list.append("train_auc_scores")
     append_list.extend(train_auc_scores)
+    append_list.append("test_auc_scores")
     append_list.extend(test_auc_scores)
+    append_list.append("highest_auc_score")
     append_list.append(highest_auc_score)
 
-
     #csv파일 열어서 한줄 추가해주기
-    with open(record_path, 'a') as f:
+    with open(record_path, 'a', newline='') as f:
         wr = csv.writer(f)
         wr.writerow(append_list)
 

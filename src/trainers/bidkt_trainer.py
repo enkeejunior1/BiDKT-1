@@ -248,8 +248,8 @@ class BidktTrainer():
             test_auc_score, y_trues, y_scores = self._test(test_loader)
 
             # train, test record 저장
-            train_auc_scores.append([train_auc_score])
-            test_auc_scores.append([test_auc_score])
+            train_auc_scores.append(train_auc_score)
+            test_auc_scores.append(test_auc_score)
 
             if test_auc_score >= highest_auc_score:
                 highest_auc_score = test_auc_score
