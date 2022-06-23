@@ -10,6 +10,8 @@ from torch.optim import SGD, Adam
 
 from torch.nn.functional import binary_cross_entropy
 
+import matplotlib.pyplot as plt
+
 def collate_fn(batch, pad_val=-1):
 
     q_seqs = []
@@ -145,7 +147,7 @@ class EarlyStopping:
 
 #recoder
 #깔끔하게 한장의 csv로 나오도록 바꿔보기
-def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, config):
+def recorder(test_auc_score, record_time, config):
 
     dir_path = "../score_records/"
     record_path = dir_path + "auc_record.csv"
@@ -155,28 +157,14 @@ def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, 
 
     append_list.append(record_time)
     append_list.extend([
-        config.model_fn,
-        config.batch_size,
-        config.n_epochs,
-        config.learning_rate,
-        config.model_name,
-        config.optimizer,
-        config.dataset_name,
-        config.max_seq_len,
-        config.num_encoder,
-        config.hidden_size,
-        config.num_head,
-        config.dropout_p,
-        config.grad_acc,
-        config.grad_acc_iter,
-        config.fivefold
+        config.model_fn, config.batch_size, config.n_epochs,
+        config.learning_rate, config.model_name, config.optimizer,
+        config.dataset_name, config.max_seq_len, config.num_encoder,
+        config.hidden_size, config.num_head, config.dropout_p,
+        config.grad_acc, config.grad_acc_iter, config.fivefold
     ])
-    append_list.append("train_auc_scores")
-    append_list.extend(train_auc_scores)
-    append_list.append("test_auc_scores")
-    append_list.extend(test_auc_scores)
-    append_list.append("highest_auc_score")
-    append_list.append(highest_auc_score)
+    append_list.append("test_auc_score")
+    append_list.append(test_auc_score)
 
     #csv파일 열어서 한줄 추가해주기
     with open(record_path, 'a', newline='') as f:
@@ -185,5 +173,9 @@ def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, 
 
 
 # visualizer도 여기에 하나 만들기
-def visualizer():
-    pass
+def visualizer(train_auc_scores, valid_auc_scores, record_time):
+    plt.plot(train_auc_scores)
+    plt.plot(valid_auc_scores)
+    plt.legend(['train_auc_scores', 'valid_auc_scores'])
+    path = "../graphs/"
+    plt.savefig(path + record_time + ".png")

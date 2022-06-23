@@ -5,7 +5,7 @@ import torch
 from get_modules.get_loaders import get_loaders
 from get_modules.get_models import get_models
 from get_modules.get_trainers import get_trainers
-from utils import get_optimizers, get_crits, recorder
+from utils import get_optimizers, get_crits, recorder, visualizer
 
 from define_argparser import define_argparser
 
@@ -63,24 +63,28 @@ if __name__ == "__main__":
         # highest_auc_scores = []
         # train_auc_scores_list = []
         # valid_auc_scores_list =[]
-        # test_auc_scores_list = []
+        test_scores_list = []
         
 
         for idx in range(5):
             train_loader, valid_loader, test_loader, num_q, num_r = get_loaders(config, idx)
-            train_auc_scores, valid_auc_scores, highest_auc_score, test_auc_score, record_time = main(config, train_loader, valid_loader, test_loader, num_q, num_r)
+            train_auc_scores, valid_auc_scores, \
+                 best_valid_score, test_auc_score,  \
+                    record_time = main(config, train_loader, valid_loader, test_loader, num_q, num_r)
             # highest_auc_scores.append(highest_auc_score)
             # train_auc_scores_list.append(train_auc_scores)
             # valid_auc_scores_list.append(valid_auc_scores)
-            # test_auc_scores_list.append(test_auc_scores)
+            test_scores_list.append(test_auc_score)
 
         # highest_auc_scores = sum(highest_auc_scores)/5
         # train_auc_scores = get_average_scores(train_auc_scores_list)
         # valid_auc_scores = get_average_scores(valid_auc_scores_list)
-        # test_auc_scores = get_average_scores(test_auc_scores_list)
+        test_auc_score = sum(test_scores_list)/5
 
-        # recorder(train_auc_scores, valid_auc_scores, test_auc_scores, highest_auc_scores, record_time, config)        
+        recorder(test_auc_score, record_time, config)        
     else:
-        train_auc_scores, valid_auc_scores, test_auc_scores, highest_auc_score, record_time = main(config)
-        # recorder(train_auc_scores, valid_auc_scores, test_auc_scores, highest_auc_score, record_time, config)
+        train_auc_scores, valid_auc_scores, \
+             best_valid_score, test_auc_score, record_time = main(config)
+        recorder(test_auc_score, record_time, config)
+        visualizer(train_auc_scores, valid_auc_scores, record_time)
     
