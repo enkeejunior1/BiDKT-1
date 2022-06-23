@@ -1,3 +1,5 @@
+#lightning으로 수정 중
+
 import torch
 from copy import deepcopy
 

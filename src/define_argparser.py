@@ -9,7 +9,8 @@ def define_argparser():
 
     # basic arguments
     p.add_argument('--gpu_id', type=int, default=0 if torch.cuda.is_available() else -1)
-    p.add_argument('--train_ratio', type=float, default=.8) #test_ratio는 train_ratio에 따라 정해지도록 설정
+    p.add_argument('--train_ratio', type=float, default=.8)
+    p.add_argument('--valid_ratio', type=float, default=.1)
     p.add_argument('--batch_size', type=int, default=64)
     p.add_argument('--n_epochs', type=int, default=20)
     p.add_argument('--verbose', type=int, default=2)

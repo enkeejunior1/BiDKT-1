@@ -3,6 +3,7 @@ import numpy as np
 import csv
 
 import torch
+import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 
 from torch.optim import SGD, Adam
@@ -55,24 +56,92 @@ def get_crits(config):
     if config.crit == "binary_cross_entropy":
         crit = binary_cross_entropy
     #-> 추가적인 criterion 설정
+    elif config.crit == "rmse":
+        class RMSELoss(nn.Module):
+            def __init__(self, eps=1e-8):
+                super().__init__()
+                self.mse = nn.MSELoss()
+                self.eps = eps
+
+            def forward(self, y_hat, y):
+                loss =  torch.sqrt(self.mse(y_hat, y) + self.eps)
+                return loss
+
+        crit = RMSELoss()
     else:
         print("Wrong criterion was used...")
 
     return crit
 
-#score_lists는 이중리스트여야 함
-def get_average_scores(score_lists):
+# early stop
+class EarlyStopping:
+    """주어진 patience 이후로 validation loss가 개선되지 않으면 학습을 조기 중지"""
+    def __init__(self, metric_name, best_score=0, patience=10, verbose=True, delta=0, path='../checkpoints/checkpoint.pt'):
+        """
+        Args:
+            patience (int): validation loss가 개선된 후 기다리는 기간
+                            Default: 10
+            verbose (bool): True일 경우 각 validation loss의 개선 사항 메세지 출력
+                            Default: False
+            delta (float): 개선되었다고 인정되는 monitered quantity의 최소 변화
+                            Default: 0
+            path (str): checkpoint저장 경로
+                            Default: 'checkpoint.pt'
+        """
+        self.metric_name = metric_name
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = best_score
+        self.early_stop = False
+        self.val_loss_min = best_score
+        self.delta = delta
+        self.path = path
 
-    result_scores = []
+    def __call__(self, val_loss, model):
 
-    for i in range(len(score_lists[0])):
-        result_score = []
-        for j in range(len(score_lists)):
-            result_score.append(score_lists[j][i])
-        result_score = sum(result_score) / len(result_score)
-        result_scores.append(result_score)
+        score = val_loss
+        
+        # AUC 값이 커져야 성능 증가
+        if self.metric_name == "AUC":
+            # best_score가 없을 때
+            if self.best_score is None:
+                self.best_score = score
+                self.save_checkpoint(val_loss, model)
+            # 현재 값이 best_score보다 작을때(성능 감소)
+            elif score < self.best_score + self.delta:
+                self.counter += 1
+                print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+                if self.counter >= self.patience:
+                    self.early_stop = True
+            # 현재 값이 best_score보다 커질때(성능 증가)
+            else:
+                self.best_score = score
+                self.save_checkpoint(val_loss, model)
+                self.counter = 0
+        # RMSE 값이 줄어야 성능 증가
+        elif self.metric_name == "RMSE":
+            if self.best_score is None:
+                self.best_score = score
+                self.save_checkpoint(val_loss, model)
+            # 현재 값이 best_score보다 클때(성능 감소)
+            elif score > self.best_score + self.delta:
+                self.counter += 1
+                print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+                if self.counter >= self.patience:
+                    self.early_stop = True
+            # 현재 값이 best_score보다 작아질때(성능 증가)
+            else:
+                self.best_score = score
+                self.save_checkpoint(val_loss, model)
+                self.counter = 0
 
-    return result_scores
+    def save_checkpoint(self, val_loss, model):
+        '''validation loss가 감소하면 모델을 저장한다.'''
+        if self.verbose:
+            print(f'Validation loss was updated ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        torch.save(model.state_dict(), self.path)
+        self.val_loss_min = val_loss
 
 #recoder
 #깔끔하게 한장의 csv로 나오도록 바꿔보기
@@ -113,6 +182,7 @@ def recorder(train_auc_scores, test_auc_scores, highest_auc_score, record_time, 
     with open(record_path, 'a', newline='') as f:
         wr = csv.writer(f)
         wr.writerow(append_list)
+
 
 # visualizer도 여기에 하나 만들기
 def visualizer():
