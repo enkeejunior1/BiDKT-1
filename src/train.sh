@@ -2,7 +2,7 @@
 
 datasets="assist2015 assist2009"
 num_encoders="12 24"
-grad_acc_iters="8"
+grad_acc_iter="8"
 
 for dataset in ${datasets}
 do
