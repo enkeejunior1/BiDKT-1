@@ -2,6 +2,8 @@ from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
 from utils import collate_fn
 from dataloaders.assist2015_loader import ASSIST2015
 from dataloaders.assist2009_loader import ASSIST2009
+from dataloaders.algebra2005_loader import ALGEBRA2005
+from dataloaders.algebra2006_loader import ALGEBRA2006
 
 #get_loaders를 따로 만들고, 이 함수를 train에서 불러내기
 def get_loaders(config, idx=None):
@@ -11,6 +13,10 @@ def get_loaders(config, idx=None):
         dataset = ASSIST2015(config.max_seq_len)
     elif config.dataset_name == "assist2009":
         dataset = ASSIST2009(config.max_seq_len)
+    elif config.dataset_name == "algebra2005":
+        dataset = ALGEBRA2005(config.max_seq_len)
+    elif config.dataset_name == "algebra2006":
+        dataset = ALGEBRA2006(config.max_seq_len)
     else:
         print("Wrong dataset_name was used...")
 
