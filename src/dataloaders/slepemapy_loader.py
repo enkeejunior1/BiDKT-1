@@ -33,6 +33,9 @@ class SLEPEMAPY(Dataset):
         return self.len
 
     def preprocess(self):
+
+        print("preprocessing...")
+
         df = pd.read_csv(self.dataset_dir)
         df = df[(df["correct"] == 0) | (df["correct"] == 1)]
 
@@ -59,6 +62,8 @@ class SLEPEMAPY(Dataset):
 
     #수정할 것
     def match_seq_len(self, q_seqs, r_seqs, max_seq_len, pad_val=-1):
+
+        print("match_seq_len...")
 
         proc_q_seqs = []
         proc_r_seqs = []

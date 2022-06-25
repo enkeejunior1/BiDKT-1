@@ -65,7 +65,6 @@ if __name__ == "__main__":
         # valid_auc_scores_list =[]
         test_scores_list = []
         
-
         for idx in range(5):
             train_loader, valid_loader, test_loader, num_q, num_r = get_loaders(config, idx)
             train_auc_scores, valid_auc_scores, \
