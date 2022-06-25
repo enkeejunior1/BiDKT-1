@@ -33,7 +33,7 @@ class ALGEBRA2006(Dataset):
         return self.len
 
     def preprocess(self):
-        df = pd.read_csv(self.dataset_dir).dropna(subset=["KC(Default)"]).sort_values(by=["Step Start Time"])
+        df = pd.read_csv(self.dataset_dir).dropna(subset=["KC(Default)"]).dropna(subset=["Correct First Attempt"]).sort_values(by=["Step Start Time"])
 
         u_list = np.unique(df["Anon Student Id"].values) #중복되지 않은 user의 목록
         q_list = np.unique(df["KC(Default)"].values) #중복되지 않은 question의 목록

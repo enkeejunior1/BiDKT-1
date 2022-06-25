@@ -160,7 +160,7 @@ class Bidkt(nn.Module):
         device,
         dropout_p=.1,
     ):
-        self.num_q = num_q # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
+        self.num_q = num_q
         self.num_r = num_r + 2 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -203,6 +203,7 @@ class Bidkt(nn.Module):
         # seq_len = (n,)
         pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q).to(self.device)
         # |pos| = (bs, n)
+        
         emb = self.emb_q(q) + self.emb_r(r) + self.emb_p(pos)
         # |emb| = (bs, n, hs)
 
@@ -220,7 +221,7 @@ class Bidkt(nn.Module):
 
         emb = self._positional_embedding(q, r)
         # |emb| = (bs, n, emb_size)
-        
+
         z = self.emb_dropout(emb)
         # |z| = (bs, n, emb_size)
 
