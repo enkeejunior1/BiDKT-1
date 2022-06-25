@@ -1,18 +1,38 @@
 import numpy as np
 import pandas as pd
+import os
+import pickle
 
 from torch.utils.data import Dataset
 
 DATASET_DIR = "../datasets/slepemapy/preprocessed_slepemapy.csv"
+PICKLE_DIR = "../datasets/slepemapy/"
 
 class SLEPEMAPY(Dataset):
     def __init__(self, max_seq_len, dataset_dir=DATASET_DIR) -> None:
         super().__init__()
 
         self.dataset_dir = dataset_dir
+        self.pickle_dir = PICKLE_DIR
         
-        self.q_seqs, self.r_seqs, self.q_list, self.u_list, self.r_list, self.q2idx, \
-            self.u2idx = self.preprocess() #가장 아래에서 각각의 요소를 가져옴
+        if os.path.exists(os.path.join(self.pickle_dir, "q_seqs.pkl")):
+            with open(os.path.join(self.pickle_dir, "q_seqs.pkl"), "rb") as f:
+                self.q_seqs = pickle.load(f)
+            with open(os.path.join(self.pickle_dir, "r_seqs.pkl"), "rb") as f:
+                self.r_seqs = pickle.load(f)
+            with open(os.path.join(self.pickle_dir, "q_list.pkl"), "rb") as f:
+                self.q_list = pickle.load(f)
+            with open(os.path.join(self.pickle_dir, "u_list.pkl"), "rb") as f:
+                self.u_list = pickle.load(f)
+            with open(os.path.join(self.pickle_dir, "r_list.pkl"), "rb") as f:
+                self.r_list = pickle.load(f)
+            with open(os.path.join(self.pickle_dir, "q2idx.pkl"), "rb") as f:
+                self.q2idx = pickle.load(f)
+            with open(os.path.join(self.pickle_dir, "u2idx.pkl"), "rb") as f:
+                self.u2idx = pickle.load(f)
+        else:
+            self.q_seqs, self.r_seqs, self.q_list, self.u_list, self.r_list, self.q2idx, \
+                self.u2idx = self.preprocess() #가장 아래에서 각각의 요소를 가져옴
 
         self.num_u = self.u_list.shape[0]
         self.num_q = self.q_list.shape[0]
@@ -34,13 +54,11 @@ class SLEPEMAPY(Dataset):
 
     def preprocess(self):
 
-        print("preprocessing...")
-
+        #pickle로 미리 저장해두기
         df = pd.read_csv(self.dataset_dir)
-        df = df[(df["correct"] == 0) | (df["correct"] == 1)]
 
         u_list = np.unique(df["user"].values) #중복되지 않은 user의 목록
-        q_list = np.unique(df["id"].values) #중복되지 않은 question의 목록
+        q_list = np.unique(df["options"].values) #중복되지 않은 question의 목록
         r_list = np.unique(df["correct"].values)
 
         u2idx = {u: idx for idx, u in enumerate(u_list)} #중복되지 않은 user에게 idx를 붙여준 딕셔너리
@@ -52,18 +70,32 @@ class SLEPEMAPY(Dataset):
         for u in u_list:
             df_u = df[df["user"] == u]
 
-            q_seq = np.array([q2idx[q] for q in df_u["id"].values]) # 판다스로 짜는게 좋음
+            q_seq = np.array([q2idx[q] for q in df_u["options"].values]) # 판다스로 짜는게 좋음
             r_seq = df_u["correct"].values
 
             q_seqs.append(q_seq)
             r_seqs.append(r_seq)
 
+        #pickle로 만들기
+        with open(os.path.join(self.pickle_dir, "q_seqs.pkl"), "wb") as f:
+            pickle.dump(q_seqs, f)
+        with open(os.path.join(self.pickle_dir, "r_seqs.pkl"), "wb") as f:
+            pickle.dump(r_seqs, f)
+        with open(os.path.join(self.pickle_dir, "q_list.pkl"), "wb") as f:
+            pickle.dump(q_list, f)
+        with open(os.path.join(self.pickle_dir, "u_list.pkl"), "wb") as f:
+            pickle.dump(u_list, f)
+        with open(os.path.join(self.pickle_dir, "r_list.pkl"), "wb") as f:
+            pickle.dump(r_list, f)
+        with open(os.path.join(self.pickle_dir, "q2idx.pkl"), "wb") as f:
+            pickle.dump(q2idx, f)
+        with open(os.path.join(self.pickle_dir, "u2idx.pkl"), "wb") as f:
+            pickle.dump(u2idx, f)
+
         return q_seqs, r_seqs, q_list, u_list, r_list, q2idx, u2idx
 
     #수정할 것
     def match_seq_len(self, q_seqs, r_seqs, max_seq_len, pad_val=-1):
-
-        print("match_seq_len...")
 
         proc_q_seqs = []
         proc_r_seqs = []

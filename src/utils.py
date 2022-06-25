@@ -18,6 +18,7 @@ def collate_fn(batch, pad_val=-1):
     r_seqs = []
 
     for q_seq, r_seq in batch:
+
         q_seqs.append(torch.Tensor(q_seq)) #총 데이터(M개) 중에서 앞의 첫번째 ~ (M-1), 갯수 M-1개
         r_seqs.append(torch.Tensor(r_seq)) #총 데이터(M개) 중에서 앞의 첫번째 ~ (M-1), 갯수 M-1개
 
