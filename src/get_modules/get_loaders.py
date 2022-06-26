@@ -6,6 +6,8 @@ from dataloaders.algebra2005_loader import ALGEBRA2005
 from dataloaders.algebra2006_loader import ALGEBRA2006
 from dataloaders.slepemapy_loader import SLEPEMAPY
 from dataloaders.ednet_loader import EDNET
+from dataloaders.assist2017_loader import ASSIST2017
+from dataloaders.statics_loader import STATICS
 
 #get_loaders를 따로 만들고, 이 함수를 train에서 불러내기
 def get_loaders(config, idx=None):
@@ -23,6 +25,10 @@ def get_loaders(config, idx=None):
         dataset = SLEPEMAPY(config.max_seq_len)
     elif config.dataset_name == "ednet":
         dataset = EDNET(config.max_seq_len)
+    elif config.dataset_name == "assist2017":
+        dataset = ASSIST2017(config.max_seq_len)
+    elif config.dataset_name == "statics":
+        dataset = STATICS(config.max_seq_len)        
     else:
         print("Wrong dataset_name was used...")
 
