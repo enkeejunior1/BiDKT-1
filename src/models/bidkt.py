@@ -95,9 +95,12 @@ class EncoderBlock(nn.Module):
         self,
         hidden_size, #512
         n_splits,
+        use_leakyrelu,
         dropout_p=.1,
     ):
         super().__init__()
+
+        self.use_leakyrelu = use_leakyrelu
 
         self.attn = MultiHead(hidden_size, n_splits)
         self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
@@ -105,7 +108,7 @@ class EncoderBlock(nn.Module):
 
         self.fc = nn.Sequential(
             nn.Linear(hidden_size, hidden_size * 4),
-            nn.LeakyReLU(),
+            nn.LeakyReLU() if self.use_leakyrelu else nn.GELU(),
             nn.Linear(hidden_size * 4, hidden_size),
         )
         self.fc_norm = nn.LayerNorm(hidden_size)
@@ -158,6 +161,7 @@ class Bidkt(nn.Module):
         num_encoder,
         max_seq_len,
         device,
+        use_leakyrelu,
         dropout_p=.1,
     ):
         self.num_q = num_q
@@ -168,6 +172,7 @@ class Bidkt(nn.Module):
         self.num_encoder = num_encoder
         self.max_seq_len = max_seq_len
         self.device = device
+        self.use_leakyrelu = use_leakyrelu
         self.dropout_p = dropout_p
 
         super().__init__()
@@ -185,6 +190,7 @@ class Bidkt(nn.Module):
             *[EncoderBlock(
                 hidden_size,
                 num_head,
+                self.use_leakyrelu,
                 dropout_p,
               ) for _ in range(num_encoder)],
         )
