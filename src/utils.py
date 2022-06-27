@@ -162,7 +162,7 @@ def recorder(test_auc_score, record_time, config):
         config.learning_rate, config.model_name, config.optimizer,
         config.dataset_name, config.max_seq_len, config.num_encoder,
         config.hidden_size, config.num_head, config.dropout_p,
-        config.grad_acc, config.grad_acc_iter, config.fivefold
+        config.grad_acc, config.grad_acc_iter, config.fivefold, config.use_leakyrelu
     ])
     append_list.append("test_auc_score")
     append_list.append(test_auc_score)
