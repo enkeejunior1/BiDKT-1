@@ -3,9 +3,9 @@ import pandas as pd
 
 from torch.utils.data import Dataset
 
-DATASET_DIR = "../datasets/assist/assist2009/assist2009_pid.csv"
+DATASET_DIR = "../datasets/skill_builder_data.csv"
 
-class ASSIST2009(Dataset):
+class ASSIST2009PID(Dataset):
     def __init__(self, max_seq_len, dataset_dir=DATASET_DIR) -> None:
         super().__init__()
 
@@ -38,7 +38,7 @@ class ASSIST2009(Dataset):
         df = df[(df["correct"] == 0) | (df["correct"] == 1)]
 
         u_list = np.unique(df["user_id"].values) #중복되지 않은 user의 목록
-        q_list = np.unique(df["problem_id"].values) #중복되지 않은 question의 목록
+        q_list = np.unique(df["skill_name"].values) #중복되지 않은 question의 목록
         r_list = np.unique(df["correct"].values)
 
         u2idx = {u: idx for idx, u in enumerate(u_list)} #중복되지 않은 user에게 idx를 붙여준 딕셔너리
@@ -48,9 +48,9 @@ class ASSIST2009(Dataset):
         r_seqs = [] #로그 기준으로 각 user별 정답 목록을 담은 리스트
 
         for u in u_list:
-            df_u = df[df["user_id"] == u]
+            df_u = df[df["user_id"] == u].sort_values("order_id")
 
-            q_seq = np.array([q2idx[q] for q in df_u["problem_id"].values]) # 판다스로 짜는게 좋음
+            q_seq = np.array([q2idx[q] for q in df_u["skill_name"].values]) # 판다스로 짜는게 좋음
             r_seq = df_u["correct"].values
 
             q_seqs.append(q_seq)
