@@ -12,7 +12,6 @@ do
         --model_fn model.pth \
         --dataset_name ${dataset2} \
         --num_encoder ${encoder_num} \
-        --crit rmse \
         --batch_size 256 \
         --grad_acc True \
         --grad_acc_iter 2 \
@@ -31,7 +30,6 @@ do
         --model_fn model.pth \
         --dataset_name ${dataset2} \
         --num_encoder ${encoder_num} \
-        --crit rmse \
         --batch_size 256 \
         --grad_acc True \
         --grad_acc_iter 2 \
