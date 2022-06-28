@@ -12,7 +12,7 @@ def get_models(num_q, num_r, device, config):
             num_encoder=config.num_encoder,
             max_seq_len=config.max_seq_len,
             device=device,
-            use_leakyrelu=config.use_leakyrelu,
+            use_gelu=config.use_gelu,
             dropout_p=config.dropout_p,
         ).to(device)
     else:
