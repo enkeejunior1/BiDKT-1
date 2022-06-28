@@ -29,7 +29,7 @@ def define_argparser():
     p.add_argument('--num_head', type=int, default=16) #원래는 16, hidden_size가 나누어지도록
     p.add_argument('--output_size', type=int, default=1) #정답일 확률값만 알면 되므로, 0~1사이의 값
     p.add_argument('--dropout_p', type=int, default=.1)
-    p.add_argument('--use_gelu', type=bool, default=True)
+    p.add_argument('--use_leakyrelu', type=bool, default=True)
 
     # grad_accumulation
     p.add_argument('--grad_acc', type=bool, default=False)
