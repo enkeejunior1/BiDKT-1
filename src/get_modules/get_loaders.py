@@ -15,20 +15,46 @@ def get_loaders(config, idx=None):
     #1. dataset 선택
     if config.dataset_name == "assist2015":
         dataset = ASSIST2015(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None
     elif config.dataset_name == "assist2009":
         dataset = ASSIST2009(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None
     elif config.dataset_name == "algebra2005":
         dataset = ALGEBRA2005(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None
     elif config.dataset_name == "algebra2006":
         dataset = ALGEBRA2006(config.max_seq_len)
+        um_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None
     elif config.dataset_name == "slepemapy":
         dataset = SLEPEMAPY(config.max_seq_len)
+        um_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None
     elif config.dataset_name == "ednet":
         dataset = EDNET(config.max_seq_len)
+        um_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None
     elif config.dataset_name == "assist2017":
         dataset = ASSIST2017(config.max_seq_len)
+        um_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None
     elif config.dataset_name == "statics":
-        dataset = STATICS(config.max_seq_len)        
+        dataset = STATICS(config.max_seq_len)  
+        um_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = None      
+    elif config.dataset_name == "assist2009_pid":
+        pass
     else:
         print("Wrong dataset_name was used...")
 
@@ -124,4 +150,4 @@ def get_loaders(config, idx=None):
         collate_fn = collate_fn
     )
 
-    return train_loader, valid_loader, test_loader, num_q, num_r
+    return train_loader, valid_loader, test_loader, num_q, num_r, num_pid
