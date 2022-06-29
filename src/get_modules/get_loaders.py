@@ -9,6 +9,7 @@ from dataloaders.ednet_loader import EDNET
 from dataloaders.assist2017_loader import ASSIST2017
 from dataloaders.statics_loader import STATICS
 from dataloaders.assist2009_pid_loader import ASSIST2009_PID
+from dataloaders.assist2017_pid_loader import ASSIST2017_PID
 
 #get_loaders를 따로 만들고, 이 함수를 train에서 불러내기
 def get_loaders(config, idx=None):
@@ -56,6 +57,11 @@ def get_loaders(config, idx=None):
         num_pid = None      
     elif config.dataset_name == "assist2009_pid":
         dataset = ASSIST2009_PID(config.max_seq_len)  
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+    elif config.dataset_name == "assist2017_pid":
+        dataset = ASSIST2017_PID(config.max_seq_len)  
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid
