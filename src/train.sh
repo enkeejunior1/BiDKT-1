@@ -1,16 +1,18 @@
 #!/bin/bash
 
-datasets2="assist2009 assist2015 assist2017"
+pid_datasets="assist2009_pid assist2017_pid"
+datasets="assist2009 assist2015 assist2017"
 encoder_nums="12 16"
 
-for dataset2 in ${datasets2}
+for pid_dataset in ${pid_datasets}
 do
     for encoder_num in ${encoder_nums}
     do
         python \
         train.py \
-        --model_fn model.pth \
-        --dataset_name ${dataset2} \
+        --model_fn bert4kt_plus_leakyrelu_model.pth \
+        --model_name bert4kt_plus \
+        --dataset_name ${pid_dataset} \
         --num_encoder ${encoder_num} \
         --batch_size 256 \
         --grad_acc True \
@@ -21,14 +23,15 @@ do
     done
 done
 
-for dataset2 in ${datasets2}
+#gelu
+for dataset in ${datasets}
 do
     for encoder_num in ${encoder_nums}
     do
         python \
         train.py \
-        --model_fn model.pth \
-        --dataset_name ${dataset2} \
+        --model_fn bidkt_gelu_model.pth \
+        --dataset_name ${dataset} \
         --num_encoder ${encoder_num} \
         --batch_size 256 \
         --grad_acc True \
