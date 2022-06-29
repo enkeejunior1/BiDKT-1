@@ -28,7 +28,7 @@ class ASSIST2017_PID(Dataset):
 
     def __getitem__(self, index):
         #출력되는 벡터는 모두 101개로 전처리되어있고, 만약 빈칸이 있는 데이터의 경우에는 -1로 채워져있음
-        return self.q_seqs[index], self.r_seqs[index]
+        return self.q_seqs[index], self.r_seqs[index], self.pid_seqs[index]
 
     def __len__(self):
         return self.len

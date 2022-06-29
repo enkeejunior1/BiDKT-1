@@ -149,7 +149,7 @@ class MySequential(nn.Sequential):
         return x
 
 
-class Bert4ktPlus(nn.Module):
+class Bert4ktRasch(nn.Module):
 
     def __init__(
         self,
@@ -179,12 +179,9 @@ class Bert4ktPlus(nn.Module):
 
         super().__init__()
 
-        # question embedding
-        self.emb_q = nn.Embedding(self.num_q, self.hidden_size).to(self.device)
-        self.emb_q_diff = nn.Embedding(self.num_q, self.hidden_size).to(self.device)
         # question + response embedding
-        self.emb_qr = nn.Embedding(self.num_q*2, self.hidden_size).to(self.device)
-        self.emb_qr_diff = nn.Embedding(self.num_q*2, self.hidden_size).to(self.device)
+        self.emb_qr = nn.Embedding(self.num_q*2 + 1, self.hidden_size).to(self.device)
+        self.emb_qr_diff = nn.Embedding(self.num_q*2 + 1, self.hidden_size).to(self.device)
 
         self.diff_emb = nn.Embedding(self.num_pid, 1)
 
@@ -208,7 +205,8 @@ class Bert4ktPlus(nn.Module):
             nn.Sigmoid() # binary
         )
 
-    # rasch embedding 구현 중
+    # rasch embedding 구현 완료
+    # akt와 모델 구조가 달라서, qr에 대한 rasch만 받는 것으로 설정함
     def _rasch_embedding(self, q, r, pid):
         # |q| = (bs, n)
         # |r| = (bs, n)
@@ -219,8 +217,21 @@ class Bert4ktPlus(nn.Module):
         # seq_len = (n,)
         pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q).to(self.device)
         # |pos| = (bs, n)
+
+        # 여기서 문제 발생
+        emb_qr = self.emb_qr(qr)
+        print("emb_qr", emb_qr)
+        emb_qr_diff = self.emb_qr_diff(qr)
+        print("emb_qr_diff", emb_qr_diff)
+        diff_emb = self.diff_emb(pid)
+        print("diff_emb", diff_emb)
+
+        # rasch embedding
+        rasch_emb = emb_qr + diff_emb * emb_qr_diff
+        # positional embedding
+        pos_emb = self.emb_p(pos)
         
-        emb = self.emb_q(q) + self.emb_r(r) + self.emb_p(pos) + self.emb_pid(pid)
+        emb = rasch_emb + pos_emb
         # |emb| = (bs, n, hs)
 
         return emb
@@ -235,7 +246,7 @@ class Bert4ktPlus(nn.Module):
             mask_enc = mask.unsqueeze(-1).expand(mask.size(0), mask.size(1), mask.size(1)).bool()
              # |mask_enc| = (bs, n, n)
 
-        emb = self._positional_embedding(q, r, pid)
+        emb = self._rasch_embedding(q, r, pid)
         # |emb| = (bs, n, emb_size)
 
         z = self.emb_dropout(emb)
