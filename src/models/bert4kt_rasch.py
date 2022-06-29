@@ -180,8 +180,8 @@ class Bert4ktRasch(nn.Module):
         super().__init__()
 
         # question + response embedding
-        self.emb_qr = nn.Embedding(self.num_q*2 + 1, self.hidden_size).to(self.device)
-        self.emb_qr_diff = nn.Embedding(self.num_q*2 + 1, self.hidden_size).to(self.device)
+        self.emb_q = nn.Embedding(self.num_q, self.hidden_size).to(self.device)
+        self.emb_r = nn.Embedding(self.num_r, self.hidden_size).to(self.device)
 
         self.diff_emb = nn.Embedding(self.num_pid, 1)
 
@@ -210,21 +210,19 @@ class Bert4ktRasch(nn.Module):
     def _rasch_embedding(self, q, r, pid):
         # |q| = (bs, n)
         # |r| = (bs, n)
-        qr = q + (self.num_q * r)
-        # |qr| = (bs, n)
 
         seq_len = q.size(1)
         # seq_len = (n,)
         pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q).to(self.device)
         # |pos| = (bs, n)
 
-        # 여기서 문제 발생
-        emb_qr = self.emb_qr(qr)
-        print("emb_qr", emb_qr)
-        emb_qr_diff = self.emb_qr_diff(qr)
-        print("emb_qr_diff", emb_qr_diff)
+        # 기존 akt의 모델처럼 qr 정보를 활용하기에는 mask와 pad가 있어서 문제가 발생함
+        # 따라서 emb_qr은 emb_q와 emb_r의 element-wise로 하고, qr_diff만 넣어주는 형태로 사용함
+        # emb_qr과 emb_qr_diff는 값은 같지만, 의미가 다르므로 다르게 표기
+        emb_qr = self.emb_q(q) + self.emb_r(r)
+        emb_qr_diff = self.emb_q(q) + self.emb_r(r)
+        # 문항 난이도 정보
         diff_emb = self.diff_emb(pid)
-        print("diff_emb", diff_emb)
 
         # rasch embedding
         rasch_emb = emb_qr + diff_emb * emb_qr_diff

@@ -33,7 +33,6 @@ class ASSIST2017_PID(Dataset):
     def __len__(self):
         return self.len
 
-
     def preprocess(self):
         df = pd.read_csv(self.dataset_dir, encoding="ISO-8859-1")
         df = df[(df["correct"] == 0) | (df["correct"] == 1)]
