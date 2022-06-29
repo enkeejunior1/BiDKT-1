@@ -3,7 +3,7 @@ import pandas as pd
 
 from torch.utils.data import Dataset
 
-DATASET_DIR = "../datasets/algebra/algebra2005/algebra_2005_2006.csv"
+DATASET_DIR = "../datasets/algebra/algebra2005/algebra_2005.csv"
 
 class ALGEBRA2005(Dataset):
     def __init__(self, max_seq_len, dataset_dir=DATASET_DIR) -> None:
@@ -33,10 +33,10 @@ class ALGEBRA2005(Dataset):
         return self.len
 
     def preprocess(self):
-        df = pd.read_csv(self.dataset_dir).dropna(subset=["KC(Default)"]).dropna(subset=["Correct First Attempt"]).sort_values(by=["Step Start Time"])
+        df = pd.read_csv(self.dataset_dir).dropna(subset=["Problem Hierarchy"]).dropna(subset=["Correct First Attempt"]).sort_values(by=["Step Start Time"])
 
         u_list = np.unique(df["Anon Student Id"].values) #중복되지 않은 user의 목록
-        q_list = np.unique(df["KC(Default)"].values) #중복되지 않은 question의 목록
+        q_list = np.unique(df["Problem Hierarchy"].values) #중복되지 않은 question의 목록
         r_list = np.unique(df["Correct First Attempt"].values)
 
         u2idx = {u: idx for idx, u in enumerate(u_list)} #중복되지 않은 user에게 idx를 붙여준 딕셔너리
@@ -48,7 +48,7 @@ class ALGEBRA2005(Dataset):
         for u in u_list:
             df_u = df[df["Anon Student Id"] == u]
 
-            q_seq = np.array([q2idx[q] for q in df_u["KC(Default)"].values]) # 판다스로 짜는게 좋음
+            q_seq = np.array([q2idx[q] for q in df_u["Problem Hierarchy"].values]) # 판다스로 짜는게 좋음
             r_seq = df_u["Correct First Attempt"].values
 
             q_seqs.append(q_seq)

@@ -8,6 +8,7 @@ from dataloaders.slepemapy_loader import SLEPEMAPY
 from dataloaders.ednet_loader import EDNET
 from dataloaders.assist2017_loader import ASSIST2017
 from dataloaders.statics_loader import STATICS
+from dataloaders.assist2009_pid_loader import ASSIST2009_PID
 
 #get_loaders를 따로 만들고, 이 함수를 train에서 불러내기
 def get_loaders(config, idx=None):
@@ -30,37 +31,36 @@ def get_loaders(config, idx=None):
         num_pid = None
     elif config.dataset_name == "algebra2006":
         dataset = ALGEBRA2006(config.max_seq_len)
-        um_q = dataset.num_q
+        num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = None
     elif config.dataset_name == "slepemapy":
         dataset = SLEPEMAPY(config.max_seq_len)
-        um_q = dataset.num_q
+        num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = None
     elif config.dataset_name == "ednet":
         dataset = EDNET(config.max_seq_len)
-        um_q = dataset.num_q
+        num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = None
     elif config.dataset_name == "assist2017":
         dataset = ASSIST2017(config.max_seq_len)
-        um_q = dataset.num_q
+        num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = None
     elif config.dataset_name == "statics":
         dataset = STATICS(config.max_seq_len)  
-        um_q = dataset.num_q
+        num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = None      
     elif config.dataset_name == "assist2009_pid":
-        pass
+        dataset = ASSIST2009_PID(config.max_seq_len)  
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
     else:
         print("Wrong dataset_name was used...")
-
-    #2. unique한 question의 갯수(num_q) 받아오기
-    num_q = dataset.num_q
-    num_r = dataset.num_r
 
     if config.fivefold == True:
 
