@@ -8,8 +8,10 @@ bert based context-aware attentive knowledge tracing model
 # 수정하기
 class MonotonicAttention(nn.Module):
 
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
+
+        self.device = device
 
         self.softmax = nn.Softmax(dim=-1)
         self.softplus = nn.Softplus()
@@ -17,21 +19,20 @@ class MonotonicAttention(nn.Module):
         torch.nn.init.xavier_uniform_(self.gamma)
 
     def forward(self, Q, K, V, mask=None, dk=64):
-        # |Q| = (batch_size, m, hidden_size)
+        # |Q| = (batch_size, n, hidden_size)
         # |K| = |V| = (batch_size, n, hidden_size)
-        # |mask| = (batch_size, m, n)
+        # |mask| = (batch_size, n, n)
 
         # w = attention energy
         w = torch.bmm(Q, K.transpose(1, 2))
-
-        # |w| = (batch_size, m, n)
+        # |w| = (batch_size, n, n)
         if mask is not None:
             assert w.size() == mask.size()
             # mask를 -float('inf')로 만들어두니 overflow 문제 발생
             w.masked_fill_(mask, -1e8)
 
         # distance score
-        d = self.distance_func()
+        d = self.distance_func(w, dk)
         # attention energy
         s = d * w / (dk**.5)
         # attention value
@@ -43,11 +44,34 @@ class MonotonicAttention(nn.Module):
 
     # 거리함수는 grad를 받지 않음
     @torch.no_grad()
-    def distance_func(self):
+    def distance_func(self, w, dk):
+        # |w| = (batch_size, n, n)
+
+        w = w / (dk**.5)
+        # |w| = (batch_size, n, n)
+        score = self.softmax(w)
+        #score = score * mask.float().to(device) -> 원문인데, 필요있을까?
+
+        x1 = torch.arange(w.size(2)).expand(w.size(2), -1).to(self.device)
+        x2 = x1.transpose(0, 1).contiguous()
+
+        distcum_score = torch.cumsum(score, dim=-1)
+        disttotal_score = torch.sum( score, dim=-1, keepdim=True)
+        position_effect = torch.abs(x1-x2)[None, :, :].type(torch.FloatTensor).to(self.device)
+
+        dist_score = torch.clamp(
+            (disttotal_score - distcum_score) * position_effect, min=0.
+        )
+        dist_score = dist_score.sqrt().detach()
+
         theta = self.gamma
         theta = -1 * self.softplus(theta)
 
-        dist_scores = 0
+        total_effect = torch.clamp(
+            torch.clamp((dist_score * theta).exp(), min=1e-5), 
+            max = 1e5)
+
+        score = score * total_effect
         pass
 
 
