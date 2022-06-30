@@ -32,7 +32,7 @@ def prepare_assistments(
 
     # Only 2012 and 2017 versions have timestamps
     if data_name == "assistments09":
-        df = pd.read_csv(os.path.join(data_path, "skill_builder_data_corrected.csv"), encoding="ISO-8859-1")
+        df = pd.read_csv(os.path.join(data_path, "skill_builder_data.csv"), encoding="ISO-8859-1")
         df = df.rename(columns={"problem_id": "item_id"})
         df["timestamp"] = np.zeros(len(df), dtype=np.int64)
     elif data_name == "assistments12":

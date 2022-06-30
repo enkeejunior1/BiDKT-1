@@ -168,6 +168,7 @@ class Bert4ktPlus(nn.Module):
         self.num_q = num_q
         self.num_r = num_r + 2 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
         self.num_pid = num_pid
+
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_head = num_head

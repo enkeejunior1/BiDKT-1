@@ -1,7 +1,7 @@
 #!/bin/bash
 encoder_nums="12 16"
 
-pid_datasets="assist2009_pid assist2017_pid"
+pid_datasets="assist2009_pid assist2017_pid algebra2005_pid algebra2006_pid slepemapy_pid"
 
 for pid_dataset in ${pid_datasets}
 do
@@ -9,8 +9,8 @@ do
     do
         python \
         train.py \
-        --model_fn bert4kt_rasch_leakyrelu_model.pth \
-        --model_name bert4kt_rasch \
+        --model_fn bert4kt_plus_leakyrelu_model.pth \
+        --model_name bert4kt_plus \
         --dataset_name ${pid_dataset} \
         --num_encoder ${encoder_num} \
         --batch_size 256 \

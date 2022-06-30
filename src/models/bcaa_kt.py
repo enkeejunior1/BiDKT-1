@@ -12,6 +12,9 @@ class MonotonicAttention(nn.Module):
         super().__init__()
 
         self.softmax = nn.Softmax(dim=-1)
+        self.softplus = nn.Softplus()
+        self.gamma = nn.Parameter(torch.zeros(1, 1)) #사이즈 이후 조절
+        torch.nn.init.xavier_uniform_(self.gamma)
 
     def forward(self, Q, K, V, mask=None, dk=64):
         # |Q| = (batch_size, m, hidden_size)
@@ -27,8 +30,13 @@ class MonotonicAttention(nn.Module):
             # mask를 -float('inf')로 만들어두니 overflow 문제 발생
             w.masked_fill_(mask, -1e8)
 
-        w = self.softmax(w / (dk**.5)) #attention값
-        c = torch.bmm(w, V) #attention값과 Value값 행렬곱
+        # distance score
+        d = self.distance_func()
+        # attention energy
+        s = d * w / (dk**.5)
+        # attention value
+        a = self.softmax(s)
+        c = torch.bmm(a, V)
         # |c| = (batch_size, m, hidden_size)
 
         return c
@@ -36,6 +44,10 @@ class MonotonicAttention(nn.Module):
     # 거리함수는 grad를 받지 않음
     @torch.no_grad()
     def distance_func(self):
+        theta = self.gamma
+        theta = -1 * self.softplus(theta)
+
+        dist_scores = 0
         pass
 
 
@@ -224,7 +236,7 @@ class MySequential(nn.Sequential):
         return x
 
 
-class Bert4ktRasch(nn.Module):
+class BCAA_KT(nn.Module):
 
     def __init__(
         self,
