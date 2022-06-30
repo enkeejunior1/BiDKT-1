@@ -3,7 +3,7 @@ import pandas as pd
 
 from torch.utils.data import Dataset
 
-DATASET_DIR = "../datasets/algebra/algebra2006/algebra_2006_2007.csv"
+DATASET_DIR = "../datasets/bridge_algebra06/preprocessed_df.csv"
 
 class ALGEBRA2006(Dataset):
     def __init__(self, max_seq_len, dataset_dir=DATASET_DIR) -> None:
@@ -33,11 +33,11 @@ class ALGEBRA2006(Dataset):
         return self.len
 
     def preprocess(self):
-        df = pd.read_csv(self.dataset_dir).dropna(subset=["KC(Default)"]).dropna(subset=["Correct First Attempt"]).sort_values(by=["Step Start Time"])
+        df = pd.read_csv(self.dataset_dir, sep='\t').sort_values(by=["timestamp"])
 
-        u_list = np.unique(df["Anon Student Id"].values) #중복되지 않은 user의 목록
-        q_list = np.unique(df["KC(Default)"].values) #중복되지 않은 question의 목록
-        r_list = np.unique(df["Correct First Attempt"].values)
+        u_list = np.unique(df["user_id"].values) #중복되지 않은 user의 목록
+        q_list = np.unique(df["skill_id"].values) #중복되지 않은 question의 목록
+        r_list = np.unique(df["correct"].values)
 
         u2idx = {u: idx for idx, u in enumerate(u_list)} #중복되지 않은 user에게 idx를 붙여준 딕셔너리
         q2idx = {q: idx for idx, q in enumerate(q_list)} #중복되지 않은 question에 idx를 붙여준 딕셔너리
@@ -46,10 +46,10 @@ class ALGEBRA2006(Dataset):
         r_seqs = [] #로그 기준으로 각 user별 정답 목록을 담은 리스트
 
         for u in u_list:
-            df_u = df[df["Anon Student Id"] == u]
+            df_u = df[df["user_id"] == u]
 
-            q_seq = np.array([q2idx[q] for q in df_u["KC(Default)"].values]) # 판다스로 짜는게 좋음
-            r_seq = df_u["Correct First Attempt"].values
+            q_seq = np.array([q2idx[q] for q in df_u["skill_id"].values]) # 판다스로 짜는게 좋음
+            r_seq = df_u["correct"].values
 
             q_seqs.append(q_seq)
             r_seqs.append(r_seq)

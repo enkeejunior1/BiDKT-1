@@ -3,7 +3,7 @@ import pandas as pd
 
 from torch.utils.data import Dataset
 
-DATASET_DIR = "../datasets/assist/assist2017/assist2017_pid.csv"
+DATASET_DIR = "../datasets/assistments17/preprocessed_df.csv"
 
 class ASSIST2017_PID(Dataset):
     def __init__(self, max_seq_len, dataset_dir=DATASET_DIR) -> None:
@@ -34,13 +34,13 @@ class ASSIST2017_PID(Dataset):
         return self.len
 
     def preprocess(self):
-        df = pd.read_csv(self.dataset_dir, encoding="ISO-8859-1")
+        df = pd.read_csv(self.dataset_dir, encoding="ISO-8859-1", sep='\t')
         df = df[(df["correct"] == 0) | (df["correct"] == 1)]
 
-        u_list = np.unique(df["studentId"].values) #중복되지 않은 user의 목록
-        q_list = np.unique(df["skill"].values) #중복되지 않은 question의 목록
+        u_list = np.unique(df["user_id"].values) #중복되지 않은 user의 목록
+        q_list = np.unique(df["skill_id"].values) #중복되지 않은 question의 목록
         r_list = np.unique(df["correct"].values)
-        pid_list = np.unique(df["problemId"].values)
+        pid_list = np.unique(df["item_id"].values)
 
         u2idx = {u: idx for idx, u in enumerate(u_list)} #중복되지 않은 user에게 idx를 붙여준 딕셔너리
         q2idx = {q: idx for idx, q in enumerate(q_list)} #중복되지 않은 question에 idx를 붙여준 딕셔너리
@@ -51,11 +51,11 @@ class ASSIST2017_PID(Dataset):
         pid_seqs = []
 
         for u in u_list:
-            df_u = df[df["studentId"] == u]
+            df_u = df[df["user_id"] == u]
 
-            q_seq = np.array([q2idx[q] for q in df_u["skill"].values]) # 판다스로 짜는게 좋음
+            q_seq = np.array([q2idx[q] for q in df_u["skill_id"].values]) # 판다스로 짜는게 좋음
             r_seq = df_u["correct"].values
-            pid_seq = np.array([pid2idx[pid] for pid in df_u["problemId"].values])
+            pid_seq = np.array([pid2idx[pid] for pid in df_u["skill_id"].values])
 
             q_seqs.append(q_seq)
             r_seqs.append(r_seq)
