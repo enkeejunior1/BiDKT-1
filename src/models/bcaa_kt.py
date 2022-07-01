@@ -32,11 +32,7 @@ class MonotonicAttention(nn.Module):
             w.masked_fill_(mask, -1e8)
 
         # distance score
-<<<<<<< HEAD
-        d = self.distance_func(w)
-=======
         d = self.distance_func(w, dk)
->>>>>>> 9fae203cee37aea27920582be205a007f2b46b90
         # attention energy
         s = d * w / (dk**.5)
         # attention value
@@ -48,9 +44,6 @@ class MonotonicAttention(nn.Module):
 
     # 거리함수는 grad를 받지 않음
     @torch.no_grad()
-<<<<<<< HEAD
-    def distance_func(self, w):
-=======
     def distance_func(self, w, dk):
         # |w| = (batch_size, n, n)
 
@@ -71,7 +64,6 @@ class MonotonicAttention(nn.Module):
         )
         dist_score = dist_score.sqrt().detach()
 
->>>>>>> 9fae203cee37aea27920582be205a007f2b46b90
         theta = self.gamma
         theta = -1 * self.softplus(theta)
 
