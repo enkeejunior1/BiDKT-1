@@ -101,6 +101,52 @@ class MySequential(nn.Sequential):
 
         return x
 
+class EncoderBlock(nn.Module):
+
+    def __init__(
+        self,
+        hidden_size, #512
+        n_splits,
+        use_leakyrelu,
+        dropout_p=.1,
+    ):
+        super().__init__()
+
+        self.use_leakyrelu = use_leakyrelu
+
+        self.attn = MultiHead(hidden_size, n_splits)
+        self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
+        self.attn_dropout = nn.Dropout(dropout_p)
+
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size * 4),
+            nn.LeakyReLU() if self.use_leakyrelu else nn.GELU(),
+            nn.Linear(hidden_size * 4, hidden_size),
+        )
+        self.fc_norm = nn.LayerNorm(hidden_size)
+        self.fc_dropout = nn.Dropout(dropout_p)
+
+    def forward(self, x, mask):
+        # |x| = (bs, n, emb_size), torch.float32
+        # |mask| = (bs, n, n)
+
+        # Pre-LN:
+        z = self.attn_norm(x)
+        # |z| = (bs, n, emb_size)
+
+        # x+ means redisual connection
+        z = x + self.attn_dropout(self.attn(Q=z,
+                                            K=z,
+                                            V=z, 
+                                            mask=mask))
+        # |z| = (bs, n, hs)
+
+        z = z + self.fc_dropout(self.fc(self.fc_norm(z)))
+        # |z| = (bs, n, hs)
+
+        return z, mask
+
+
 class ALBert4ktPlus(nn.Module):
 
     def __init__(
@@ -141,19 +187,12 @@ class ALBert4ktPlus(nn.Module):
         self.emb_dropout = nn.Dropout(self.dropout_p)
 
         # for parameter sharing -> encoder 
-        self.attn = MultiHead(hidden_size, self.num_head)
-        self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
-        self.attn_dropout = nn.Dropout(dropout_p)
-        ###
-
-        # for parameter sharing -> fc
-        self.fc = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size * 4),
-            nn.LeakyReLU() if self.use_leakyrelu else nn.GELU(),
-            nn.Linear(hidden_size * 4, hidden_size),
+        self.encoder = EncoderBlock(
+            hidden_size,
+            num_head,
+            self.use_leakyrelu,
+            dropout_p
         )
-        self.fc_norm = nn.LayerNorm(hidden_size)
-        self.fc_dropout = nn.Dropout(dropout_p)
 
         self.generator = nn.Sequential(
             nn.LayerNorm(hidden_size), # Only for Pre-LN Transformer.
@@ -188,22 +227,15 @@ class ALBert4ktPlus(nn.Module):
         emb = self._positional_embedding(q, r, pid)
         # |emb| = (bs, n, emb_size)
 
-        x = self.emb_dropout(emb)
+        z = self.emb_dropout(emb)
         # |z| = (bs, n, emb_size)
 
         # for parameter sharing
         for _ in range(self.num_encoder):
-            #encoder
-            z = self.attn_norm(x)
-            z = x + self.attn_dropout(self.attn(Q=z,
-                                                K=z,
-                                                V=z, 
-                                                mask=mask_enc))
-            # |z| = (bs, n, hs)
-            x = z + self.fc_dropout(self.fc(self.fc_norm(z)))  
-            # |x| = (bs, n, hs)      
+            z, _ = self.encoder(z, mask_enc)
+        # |z| = (bs, n, hs)
 
-        y_hat = self.generator(x)
+        y_hat = self.generator(z)
         #|y_hat| = (bs, n, output_size=1)
 
         return y_hat
