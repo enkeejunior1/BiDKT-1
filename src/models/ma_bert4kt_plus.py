@@ -28,7 +28,7 @@ class MonotonicAttention(nn.Module):
             # mask를 -float('inf')로 만들어두니 overflow 문제 발생
             w.masked_fill_(mask, -1e8)
 
-        # distance score
+        # distance score, no_grad()
         d = self.distance_func(w, dk)
 
         theta = -1 * self.softplus(self.gamma)
@@ -44,16 +44,12 @@ class MonotonicAttention(nn.Module):
         c = torch.bmm(s, V)
         # |c| = (batch_size, m, hidden_size)
 
-        # print("c", c)
-        # print("c", c.size())
-        #c torch.Size([1024, 100, 32])
-
         return c
 
     # 거리함수는 grad를 받지 않음
     @torch.no_grad()
     def distance_func(self, w, dk):
-        # |w| = (batch_size, n, n)
+        # |w| = (batch_size, n, n), torch.bmm(Q, K.transpose(1, 2))
 
         w = w / (dk**.5)
         # |w| = (batch_size, n, n)
