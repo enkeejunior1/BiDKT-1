@@ -4,6 +4,7 @@ from models.bert4kt_rasch import Bert4ktRasch
 from models.albert4kt_plus import ALBert4ktPlus
 from models.bcaa_kt import BCAA_KT
 from models.ma_bert4kt_plus import MonotonicBert4ktPlus
+from models.nma_bert4kt_dualenc_kr import NmaBert4ktDualencKr
 
 def get_models(num_q, num_r, num_pid, device, config):
 
@@ -76,8 +77,8 @@ def get_models(num_q, num_r, num_pid, device, config):
             use_leakyrelu=config.use_leakyrelu,
             dropout_p=config.dropout_p,
         ).to(device)
-    elif config.model_name == "bcaa_kt":
-        model = BCAA_KT(
+    elif config.model_name == "nma_bert4kt_dualenc_kr":
+        model = NmaBert4ktDualencKr(
             num_q=num_q,
             num_r=num_r,
             num_pid=num_pid,
@@ -89,6 +90,16 @@ def get_models(num_q, num_r, num_pid, device, config):
             device=device,
             use_leakyrelu=config.use_leakyrelu,
             dropout_p=config.dropout_p,
+        ).to(device)
+    elif config.model_name == "bcaa_kt":
+        model = BCAA_KT(
+            n_question=num_q,
+            n_pid=num_pid,
+            d_model=config.akt_d_model,
+            n_blocks=config.akt_n_block,
+            kq_same=config.akt_kq_same,
+            dropout=config.akt_dropout_p,
+            model_type="akt"
         ).to(device)
     else:
         print("Wrong model_name was used...")
