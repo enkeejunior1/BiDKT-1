@@ -78,17 +78,13 @@ def get_models(num_q, num_r, num_pid, device, config):
         ).to(device)
     elif config.model_name == "bcaa_kt":
         model = BCAA_KT(
-            num_q=num_q,
-            num_r=num_r,
-            num_pid=num_pid,
-            hidden_size=config.hidden_size,
-            output_size=config.output_size,
-            num_head=config.num_head,
-            num_encoder=config.num_encoder,
-            max_seq_len=config.max_seq_len,
-            device=device,
-            use_leakyrelu=config.use_leakyrelu,
-            dropout_p=config.dropout_p,
+            n_question=num_q,
+            n_pid=num_pid,
+            d_model=config.akt_d_model,
+            n_blocks=config.akt_n_block,
+            kq_same=config.akt_kq_same,
+            dropout=config.akt_dropout_p,
+            model_type="akt"
         ).to(device)
     else:
         print("Wrong model_name was used...")
