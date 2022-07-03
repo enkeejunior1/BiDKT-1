@@ -85,7 +85,7 @@ class MultiHead(nn.Module):
         self.V_linear = nn.Linear(hidden_size, hidden_size, bias=False)
         self.linear = nn.Linear(hidden_size, hidden_size, bias=False)
 
-        self.attn = Attention()
+        self.attn = MonotonicAttention()
 
     def forward(self, Q, K, V, mask=None):
         # |Q| = |K| = |V| = (bs, n, hs)
