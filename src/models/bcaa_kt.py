@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 
-#using monotonic attention
+#non-MonotonicAttnetion
+#using dual encoder and knowledge retriever
 
 class MonotonicAttention(nn.Module):
 
@@ -70,10 +71,9 @@ class MonotonicAttention(nn.Module):
 
         return dist_score
 
-
 class MultiHead(nn.Module):
 
-    def __init__(self, hidden_size, n_splits, device, dropout_p):
+    def __init__(self, hidden_size, n_splits):
         super().__init__()
 
         self.hidden_size = hidden_size
@@ -85,7 +85,7 @@ class MultiHead(nn.Module):
         self.V_linear = nn.Linear(hidden_size, hidden_size, bias=False)
         self.linear = nn.Linear(hidden_size, hidden_size, bias=False)
 
-        self.attn = MonotonicAttention(device, dropout_p)
+        self.attn = MonotonicAttention()
 
     def forward(self, Q, K, V, mask=None):
         # |Q| = |K| = |V| = (bs, n, hs)
@@ -144,7 +144,7 @@ class EncoderBlock(nn.Module):
 
         self.use_leakyrelu = use_leakyrelu
 
-        self.attn = MultiHead(hidden_size, n_splits, device, dropout_p)
+        self.attn = MultiHead(hidden_size, n_splits)
         self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
         self.attn_dropout = nn.Dropout(dropout_p)
 
@@ -156,7 +156,7 @@ class EncoderBlock(nn.Module):
         self.fc_norm = nn.LayerNorm(hidden_size)
         self.fc_dropout = nn.Dropout(dropout_p)
 
-    def forward(self, x, mask):
+    def forward(self, x, mask=None):
         # |x| = (bs, n, emb_size), torch.float32
         # |mask| = (bs, n, n)
 
@@ -177,6 +177,58 @@ class EncoderBlock(nn.Module):
         return z, mask
 
 
+class DualEncoderBlock(nn.Module):
+
+    def __init__(
+        self,
+        hidden_size, #512
+        n_splits,
+        use_leakyrelu,
+        device,
+        dropout_p=.1,
+    ):
+        super().__init__()
+
+        self.use_leakyrelu = use_leakyrelu
+
+        self.attn = MultiHead(hidden_size, n_splits)
+        self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
+        self.attn_dropout = nn.Dropout(dropout_p)
+
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size * 4),
+            nn.LeakyReLU() if self.use_leakyrelu else nn.GELU(),
+            nn.Linear(hidden_size * 4, hidden_size),
+        )
+        self.fc_norm = nn.LayerNorm(hidden_size)
+        self.fc_dropout = nn.Dropout(dropout_p)
+
+    def forward(self, x, y, mask=None):
+        # |x| = (bs, n, emb_size), torch.float32
+        # |mask| = (bs, n, n)
+
+        # Pre-LN:
+        z_x = self.attn_norm(x)
+        # |z| = (bs, n, emb_size)
+        z_y = self.attn_norm(y)
+        # y+ means redisual connection
+
+        z_y = y + self.attn_dropout(self.attn(Q=z_y,
+                                            K=z_y,
+                                            V=z_y, 
+                                            mask=mask))
+
+        # x+ means redisual connection
+        z = x + self.attn_dropout(self.attn(Q=z_x,
+                                            K=z_x,
+                                            V=z_y, 
+                                            mask=mask))
+        # |z| = (bs, n, hs)
+        z = z + self.fc_dropout(self.fc(self.fc_norm(z)))
+        # |z| = (bs, n, hs)
+
+        return z, mask
+
 class MySequential(nn.Sequential):
     # 원래 sequential은 x 하나만 받을 수 있어서 상속받아 새로 정의
     # input을 *x로 받아서 튜플도 받을 수 있게 처리
@@ -190,8 +242,7 @@ class MySequential(nn.Sequential):
 
         return x
 
-
-class BCAA_KT(nn.Module):
+class NmaBert4ktDualencKr(nn.Module):
 
     def __init__(
         self,
@@ -222,17 +273,18 @@ class BCAA_KT(nn.Module):
 
         super().__init__()
 
-        # question embedding
+        # question + response embedding
         self.emb_q = nn.Embedding(self.num_q, self.hidden_size).to(self.device)
-        # response embedding
         self.emb_r = nn.Embedding(self.num_r, self.hidden_size).to(self.device)
+
+        self.diff_emb = nn.Embedding(self.num_pid, 1)
+
         # positional embedding
-        self.emb_pid = nn.Embedding(self.num_pid, self.hidden_size).to(self.device)
         self.emb_p = nn.Embedding(self.max_seq_len, self.hidden_size).to(self.device)
         self.emb_dropout = nn.Dropout(self.dropout_p)
 
         # MySequential을 활용해 필요한만큼 encoder block을 만듦
-        self.encoder = MySequential(
+        self.q_encoder = MySequential(
             *[EncoderBlock(
                 hidden_size,
                 num_head,
@@ -242,22 +294,56 @@ class BCAA_KT(nn.Module):
               ) for _ in range(num_encoder)],
         )
 
+        self.qa_encoder = MySequential(
+            *[EncoderBlock(
+                hidden_size,
+                num_head,
+                self.use_leakyrelu,
+                device,
+                dropout_p,
+              ) for _ in range(num_encoder)],
+        )
+
+        self.kr_encoder = nn.ModuleList(
+            [DualEncoderBlock(
+                hidden_size,
+                num_head,
+                self.use_leakyrelu,
+                device,
+                dropout_p,
+              ) for _ in range(num_encoder)]
+            )
+
         self.generator = nn.Sequential(
             nn.LayerNorm(hidden_size), # Only for Pre-LN Transformer.
             nn.Linear(hidden_size, output_size),
             nn.Sigmoid() # binary
         )
 
-    # positional embedding
-    def _positional_embedding(self, q, r, pid):
+    # rasch emb
+    def _rasch_embedding(self, q, r, pid):
         # |q| = (bs, n)
         # |r| = (bs, n)
+
         seq_len = q.size(1)
         # seq_len = (n,)
         pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q).to(self.device)
         # |pos| = (bs, n)
+
+        # 기존 akt의 모델처럼 qr 정보를 활용하기에는 mask와 pad가 있어서 문제가 발생함
+        # 따라서 emb_qr은 emb_q와 emb_r의 element-wise로 하고, qr_diff만 넣어주는 형태로 사용함
+        # emb_qr과 emb_qr_diff는 값은 같지만, 의미가 다르므로 다르게 표기
+        emb_qr = self.emb_q(q) + self.emb_r(r)
+        emb_qr_diff = self.emb_q(q) + self.emb_r(r)
+        # 문항 난이도 정보
+        diff_emb = self.diff_emb(pid)
+
+        # rasch embedding
+        rasch_emb = emb_qr + diff_emb * emb_qr_diff
+        # positional embedding
+        pos_emb = self.emb_p(pos)
         
-        emb = self.emb_q(q) + self.emb_r(r) + self.emb_p(pos) + self.emb_pid(pid)
+        emb = rasch_emb + pos_emb
         # |emb| = (bs, n, hs)
 
         return emb
@@ -272,16 +358,23 @@ class BCAA_KT(nn.Module):
             mask_enc = mask.unsqueeze(-1).expand(mask.size(0), mask.size(1), mask.size(1)).bool()
              # |mask_enc| = (bs, n, n)
 
-        emb = self._positional_embedding(q, r, pid)
-        # |emb| = (bs, n, emb_size)
+        q_emb, qa_emb = self._rasch_embedding(q, r, pid)
+        # |q_emb| = |qa_emb| = (bs, n, emb_size)
 
-        z = self.emb_dropout(emb)
+        q_z = self.emb_dropout(q_emb)
+        # |z| = (bs, n, emb_size)
+        x_t, _ = self.q_encoder(q_z, mask_enc)
         # |z| = (bs, n, emb_size)
 
-        # |mask_enc| = (bs, n, n)
+        qa_z = self.emb_dropout(qa_emb)
         # |z| = (bs, n, emb_size)
-        z, _ = self.encoder(z, mask_enc)
+        y_t, _ = self.q_encoder(qa_z, mask_enc)
         # |z| = (bs, n, hs)
+
+        z = 0
+        # knowledge retriever
+        for block in self.kr_encoder:
+            z, _ = block(x_t, y_t, mask_enc)
 
         y_hat = self.generator(z)
         #|y_hat| = (bs, n, output_size=1)

@@ -242,7 +242,7 @@ class MySequential(nn.Sequential):
 
         return x
 
-class NmaBert4ktDualencKr(nn.Module):
+class MaBert4ktDualencKr(nn.Module):
 
     def __init__(
         self,
