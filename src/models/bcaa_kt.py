@@ -73,7 +73,7 @@ class MonotonicAttention(nn.Module):
 
 class MultiHead(nn.Module):
 
-    def __init__(self, hidden_size, n_splits):
+    def __init__(self, hidden_size, n_splits, device, dropout_p):
         super().__init__()
 
         self.hidden_size = hidden_size
@@ -85,7 +85,7 @@ class MultiHead(nn.Module):
         self.V_linear = nn.Linear(hidden_size, hidden_size, bias=False)
         self.linear = nn.Linear(hidden_size, hidden_size, bias=False)
 
-        self.attn = MonotonicAttention()
+        self.attn = MonotonicAttention(device, dropout_p)
 
     def forward(self, Q, K, V, mask=None):
         # |Q| = |K| = |V| = (bs, n, hs)
@@ -144,7 +144,7 @@ class EncoderBlock(nn.Module):
 
         self.use_leakyrelu = use_leakyrelu
 
-        self.attn = MultiHead(hidden_size, n_splits)
+        self.attn = MultiHead(hidden_size, n_splits, device, dropout_p)
         self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
         self.attn_dropout = nn.Dropout(dropout_p)
 
@@ -191,7 +191,7 @@ class DualEncoderBlock(nn.Module):
 
         self.use_leakyrelu = use_leakyrelu
 
-        self.attn = MultiHead(hidden_size, n_splits)
+        self.attn = MultiHead(hidden_size, n_splits, device, dropout_p)
         self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
         self.attn_dropout = nn.Dropout(dropout_p)
 
@@ -329,24 +329,28 @@ class BcaaKt(nn.Module):
         # seq_len = (n,)
         pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q).to(self.device)
         # |pos| = (bs, n)
+        # positional embedding
+        pos_emb = self.emb_p(pos)
 
-        # 기존 akt의 모델처럼 qr 정보를 활용하기에는 mask와 pad가 있어서 문제가 발생함
-        # 따라서 emb_qr은 emb_q와 emb_r의 element-wise로 하고, qr_diff만 넣어주는 형태로 사용함
-        # emb_qr과 emb_qr_diff는 값은 같지만, 의미가 다르므로 다르게 표기
-        emb_qr = self.emb_q(q) + self.emb_r(r)
-        emb_qr_diff = self.emb_q(q) + self.emb_r(r)
         # 문항 난이도 정보
         diff_emb = self.diff_emb(pid)
 
-        # rasch embedding
-        rasch_emb = emb_qr + diff_emb * emb_qr_diff
-        # positional embedding
-        pos_emb = self.emb_p(pos)
-        
-        emb = rasch_emb + pos_emb
+        # q emb
+        emb_q = self.emb_q(q)
+        emb_q_diff = self.emb_q(q)
+
+        q_emb = emb_q + diff_emb * emb_q_diff
+        q_emb = q_emb + pos_emb
+
+        # qa embedding
+        emb_qr = self.emb_q(q) + self.emb_r(r)
+        emb_qr_diff = self.emb_q(q) + self.emb_r(r)
+
+        qa_emb = emb_qr + diff_emb * emb_qr_diff
+        qa_emb = qa_emb + pos_emb
         # |emb| = (bs, n, hs)
 
-        return emb
+        return q_emb, qa_emb
 
     def forward(self, q, r, pid, mask):
         # |q| = (bs, n)

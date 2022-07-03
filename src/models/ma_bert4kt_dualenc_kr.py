@@ -73,7 +73,7 @@ class MonotonicAttention(nn.Module):
 
 class MultiHead(nn.Module):
 
-    def __init__(self, hidden_size, n_splits):
+    def __init__(self, hidden_size, n_splits, device, dropout_p):
         super().__init__()
 
         self.hidden_size = hidden_size
@@ -85,7 +85,7 @@ class MultiHead(nn.Module):
         self.V_linear = nn.Linear(hidden_size, hidden_size, bias=False)
         self.linear = nn.Linear(hidden_size, hidden_size, bias=False)
 
-        self.attn = MonotonicAttention()
+        self.attn = MonotonicAttention(device, dropout_p)
 
     def forward(self, Q, K, V, mask=None):
         # |Q| = |K| = |V| = (bs, n, hs)
@@ -144,7 +144,7 @@ class EncoderBlock(nn.Module):
 
         self.use_leakyrelu = use_leakyrelu
 
-        self.attn = MultiHead(hidden_size, n_splits)
+        self.attn = MultiHead(hidden_size, n_splits, device, dropout_p)
         self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
         self.attn_dropout = nn.Dropout(dropout_p)
 
@@ -191,7 +191,7 @@ class DualEncoderBlock(nn.Module):
 
         self.use_leakyrelu = use_leakyrelu
 
-        self.attn = MultiHead(hidden_size, n_splits)
+        self.attn = MultiHead(hidden_size, n_splits, device, dropout_p)
         self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
         self.attn_dropout = nn.Dropout(dropout_p)
 
