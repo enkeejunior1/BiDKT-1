@@ -2,9 +2,10 @@ from models.bidkt import Bidkt
 from models.bert4kt_plus import Bert4ktPlus
 from models.bert4kt_rasch import Bert4ktRasch
 from models.albert4kt_plus import ALBert4ktPlus
-from models.bcaa_kt import BCAA_KT
+from models.bcaa_kt import BcaaKt
 from models.ma_bert4kt_plus import MonotonicBert4ktPlus
 from models.nma_bert4kt_dualenc_kr import NmaBert4ktDualencKr
+from models.ma_bert4kt_dualenc_kr import MaBert4ktDualencKr
 
 def get_models(num_q, num_r, num_pid, device, config):
 
@@ -91,15 +92,33 @@ def get_models(num_q, num_r, num_pid, device, config):
             use_leakyrelu=config.use_leakyrelu,
             dropout_p=config.dropout_p,
         ).to(device)
+    elif config.model_name == "ma_bert4kt_dualenc_kr":
+        model = MaBert4ktDualencKr(
+            num_q=num_q,
+            num_r=num_r,
+            num_pid=num_pid,
+            hidden_size=config.hidden_size,
+            output_size=config.output_size,
+            num_head=config.num_head,
+            num_encoder=config.num_encoder,
+            max_seq_len=config.max_seq_len,
+            device=device,
+            use_leakyrelu=config.use_leakyrelu,
+            dropout_p=config.dropout_p,
+        ).to(device)
     elif config.model_name == "bcaa_kt":
-        model = BCAA_KT(
-            n_question=num_q,
-            n_pid=num_pid,
-            d_model=config.akt_d_model,
-            n_blocks=config.akt_n_block,
-            kq_same=config.akt_kq_same,
-            dropout=config.akt_dropout_p,
-            model_type="akt"
+        model = BcaaKt(
+            num_q=num_q,
+            num_r=num_r,
+            num_pid=num_pid,
+            hidden_size=config.hidden_size,
+            output_size=config.output_size,
+            num_head=config.num_head,
+            num_encoder=config.num_encoder,
+            max_seq_len=config.max_seq_len,
+            device=device,
+            use_leakyrelu=config.use_leakyrelu,
+            dropout_p=config.dropout_p,
         ).to(device)
     else:
         print("Wrong model_name was used...")
