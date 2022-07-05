@@ -340,8 +340,9 @@ class ConvBert4ktPlus(nn.Module):
             nn.Sigmoid() # binary
         )
 
-    # positional embedding
-    def _positional_embedding(self, q, r, pid):
+     # positional embedding
+    @torch.no_grad()
+    def _positional_embedding(self, q):
         # |q| = (bs, n)
         # |r| = (bs, n)
         seq_len = q.size(1)
@@ -349,10 +350,10 @@ class ConvBert4ktPlus(nn.Module):
         pos = torch.arange(seq_len, dtype=torch.long).unsqueeze(0).expand_as(q).to(self.device)
         # |pos| = (bs, n)
         
-        emb = self.emb_q(q) + self.emb_r(r) + self.emb_p(pos) + self.emb_pid(pid)
+        pos_emb = self.emb_p(pos)
         # |emb| = (bs, n, hs)
 
-        return emb
+        return pos_emb
 
     def forward(self, q, r, pid, mask):
         # |q| = (bs, n)
@@ -364,7 +365,7 @@ class ConvBert4ktPlus(nn.Module):
         #     mask_enc = mask.unsqueeze(-1).expand(mask.size(0), mask.size(1), mask.size(1)).bool()
         #      # |mask_enc| = (bs, n, n), (bs, n_attn_head, n, attn_head_size)
 
-        emb = self._positional_embedding(q, r, pid)
+        emb = self.emb_q(q) + self.emb_r(r) + self.emb_pid(pid) + self._positional_embedding(q)
         # |emb| = (bs, n, emb_size)
 
         z = self.emb_dropout(emb)
