@@ -7,12 +7,12 @@ import numpy as np
 
 # BigbirdBlockSparseAttention
 class BigBirdBlockSparseAttention(nn.Module):
-    def __init__(self, hidden_size, n_splits, max_seq_len, config, seed=None):
+    def __init__(self, hidden_size, n_splits, max_seq_len, config, seed=42):
         #config.hidden_size % config.num_attention_heads == 0
         super().__init__()
 
         self.max_seqlen = max_seq_len # 100
-        self.seed = seed # None
+        self.seed = seed # 42
         self.num_attention_heads = n_splits # 16
         self.num_random_blocks = config.num_random_blocks # 3
         self.block_size = config.block_size # 10
@@ -40,43 +40,49 @@ class BigBirdBlockSparseAttention(nn.Module):
     ):
         # Currently this `class` can't be used in decoder.
 
+        # |Q| = |K| = |V| = (bs, sq, hs) = (bs, 100, 512)
         hidden_states = Q
-
+        # |hidden_states| = (bs, sq, hs)
         batch_size, seqlen, _ = hidden_states.size()
+        # batch_size = bs
+        # seqlen = sq = 100
         to_seq_length = from_seq_length = seqlen
+        # to_seq_length = from_seq_length = seqlen = sq = 100
         from_block_size = to_block_size = self.block_size
+        # from_block_size = to_block_size = self.block_size = 10
 
-        if from_seq_length % from_block_size != 0:
-            raise ValueError("Query sided sequence length must be multiple of block size")
+        # from_seq_length % from_block_size == 0
+        # to_seq_length % to_block_size == 0
 
-        if to_seq_length % to_block_size != 0:
-            raise ValueError("Key/Value sided sequence length must be multiple of block size")
-
+        # |self.query(Q)| = |self.key(K)| = |self.value(V)| = (bs, sq, hs)
         query_layer = self.transpose_for_scores(self.query(Q))
         key_layer = self.transpose_for_scores(self.key(K))
         value_layer = self.transpose_for_scores(self.value(V))
+        # |query_layer| = (bs, self.num_attention_heads, sq, self.attention_head_size) 
+        # = (bs, 16, 100, 32)
+        # = |key_layer| = |value_layer|
 
         context_layer, attention_probs = self.bigbird_block_sparse_attention(
-            query_layer,
-            key_layer,
-            value_layer,
-            band_mask,
-            from_mask,
-            to_mask,
-            from_blocked_mask,
-            to_blocked_mask,
-            self.num_attention_heads,
-            self.num_random_blocks,
-            self.attention_head_size,
-            from_block_size,
-            to_block_size,
-            batch_size,
-            from_seq_length,
-            to_seq_length,
-            seed=self.seed,
-            plan_from_length=None,
-            plan_num_rand_blocks=None,
-            output_attentions=output_attentions,
+            query_layer, #(bs, self.num_attention_heads, sq, self.attention_head_size) = (bs, 16, 100, 32)
+            key_layer, #(bs, self.num_attention_heads, sq, self.attention_head_size) = (bs, 16, 100, 32)
+            value_layer, #(bs, self.num_attention_heads, sq, self.attention_head_size) = (bs, 16, 100, 32)
+            band_mask, # None
+            from_mask, # None
+            to_mask, # None
+            from_blocked_mask, # None
+            to_blocked_mask, # None
+            self.num_attention_heads, # 16
+            self.num_random_blocks, # 3
+            self.attention_head_size, # 32
+            from_block_size, # 10
+            to_block_size, # 10
+            batch_size, # bs
+            from_seq_length, # 100
+            to_seq_length, # 100
+            seed=self.seed, # 42
+            plan_from_length=None, # None
+            plan_num_rand_blocks=None, # None
+            output_attentions=output_attentions, # None
         )
 
         context_layer = context_layer.contiguous().view(batch_size, from_seq_length, -1)
@@ -87,37 +93,32 @@ class BigBirdBlockSparseAttention(nn.Module):
     # bigbird attention
     def bigbird_block_sparse_attention(
         self,
-        query_layer,
-        key_layer,
-        value_layer,
-        band_mask,
-        from_mask,
-        to_mask,
-        from_blocked_mask,
-        to_blocked_mask,
-        n_heads,
-        n_rand_blocks,
-        attention_head_size,
-        from_block_size,
-        to_block_size,
-        batch_size,
-        from_seq_len,
-        to_seq_len,
-        seed,
-        plan_from_length,
-        plan_num_rand_blocks,
-        output_attentions,
+        query_layer, #(bs, self.num_attention_heads, sq, self.attention_head_size) = (bs, 16, 100, 32)
+        key_layer, #(bs, self.num_attention_heads, sq, self.attention_head_size) = (bs, 16, 100, 32)
+        value_layer, #(bs, self.num_attention_heads, sq, self.attention_head_size) = (bs, 16, 100, 32)
+        band_mask, # None
+        from_mask, # None
+        to_mask, # None
+        from_blocked_mask, # None
+        to_blocked_mask, # None
+        n_heads, # 16
+        n_rand_blocks, # 3
+        attention_head_size, # 32
+        from_block_size, # 10
+        to_block_size, # 10
+        batch_size, # bs
+        from_seq_len, # 100
+        to_seq_len, # 100
+        seed, # 42
+        plan_from_length, # None
+        plan_num_rand_blocks, # None
+        output_attentions, # None
     ):
 
         # BigBird block-sparse attention as suggested in paper
 
         # ITC:
         #     global tokens: 2 x block_size
-        #     window tokens: 3 x block_size
-        #     random tokens: num_rand_tokens x block_size
-
-        # ETC:
-        #     global tokens: extra_globals_tokens + 2 x block_size
         #     window tokens: 3 x block_size
         #     random tokens: num_rand_tokens x block_size
 
@@ -131,37 +132,37 @@ class BigBirdBlockSparseAttention(nn.Module):
         # attention is calculated separately for q[0], q[1], q[2:-2], q[-2], q[-1] in order to use special trick of shifting tokens (for calculating sliding attention)
         # hence following code can be divided into 5 parts.
 
-        if from_seq_len // from_block_size != to_seq_len // to_block_size:
-            raise ValueError("Error the number of blocks needs to be same!")
-
         rsqrt_d = 1 / math.sqrt(attention_head_size)
+        # rsqrt_d = 0.17677669529663687
         bsz = batch_size
+        # bsz = bs
         attn_mask_penalty = -10000.0
 
         # generate random attention and corresponding masks
         np.random.seed(seed)
-        if from_seq_len in [1024, 3072, 4096]:  # old plans used in paper
-            rand_attn = [
-                self._bigbird_block_rand_mask(
-                    self.max_seqlen, self.max_seqlen, from_block_size, to_block_size, n_rand_blocks, last_idx=1024
-                )[: (from_seq_len // from_block_size - 2)]
-                for _ in range(n_heads)
-            ]
-        else:
-            if plan_from_length is None:
-                plan_from_length, plan_num_rand_blocks = self._get_rand_attn_plan(
-                    from_seq_len, from_block_size, n_rand_blocks
-                )
+        # seed = 42
 
-            rand_attn = self._bigbird_block_rand_mask_with_head(
-                from_seq_length=from_seq_len,
-                to_seq_length=to_seq_len,
-                from_block_size=from_block_size,
-                to_block_size=to_block_size,
-                num_heads=n_heads,
-                plan_from_length=plan_from_length,
-                plan_num_rand_blocks=plan_num_rand_blocks,
-            )
+        # Gives the plan of where to put random attention.
+        plan_from_length, plan_num_rand_blocks = self._get_rand_attn_plan(
+            from_seq_len, # 100
+            from_block_size, # 10
+            n_rand_blocks # 3
+        )
+        # plan_from_length = [80, 100]
+        # plan_num_rand_blocks = [1, 2]
+        # 아래 메쏘드(_bigbird_block_rand_mask_with_head)에 사용됨
+
+        # Create adjacency list of random attention.
+        rand_attn = self._bigbird_block_rand_mask_with_head(
+            from_seq_length=from_seq_len, # 100
+            to_seq_length=to_seq_len, # 100
+            from_block_size=from_block_size, # 10
+            to_block_size=to_block_size, # 10
+            num_heads=n_heads, # 16
+            plan_from_length=plan_from_length, # [80, 100]
+            plan_num_rand_blocks=plan_num_rand_blocks, # [1, 2]
+        )
+        # rand_attn
 
         rand_attn = np.stack(rand_attn, axis=0)
         rand_attn = torch.tensor(rand_attn, device=query_layer.device, dtype=torch.long)
@@ -617,7 +618,11 @@ class BigBirdBlockSparseAttention(nn.Module):
         return rand_mask
 
     @staticmethod
-    def _get_rand_attn_plan(from_seq_length, from_block_size, num_rand_blocks):
+    def _get_rand_attn_plan(
+        from_seq_length, # 100
+        from_block_size, # 10
+        num_rand_blocks # 3
+        ):
         """
         Gives the plan of where to put random attention.
         Args:
@@ -630,17 +635,21 @@ class BigBirdBlockSparseAttention(nn.Module):
         """
 
         plan_from_length = []
+        # [80, 100]
         plan_num_rand_blocks = []
+        # [1, 2]
+
         if (2 * num_rand_blocks + 5) < (from_seq_length // from_block_size):
             plan_from_length.append(int((2 * num_rand_blocks + 5) * from_block_size))
             plan_num_rand_blocks.append(num_rand_blocks)
             plan_from_length.append(from_seq_length)
             plan_num_rand_blocks.append(0)
+        # 8 < 10
         elif (num_rand_blocks + 5) < (from_seq_length // from_block_size):
-            plan_from_length.append(int((num_rand_blocks + 5) * from_block_size))
-            plan_num_rand_blocks.append(num_rand_blocks // 2)
-            plan_from_length.append(from_seq_length)
-            plan_num_rand_blocks.append(num_rand_blocks - (num_rand_blocks // 2))
+            plan_from_length.append(int((num_rand_blocks + 5) * from_block_size)) # apppend 80
+            plan_num_rand_blocks.append(num_rand_blocks // 2) # append 3//2 = 1
+            plan_from_length.append(from_seq_length) # append 100
+            plan_num_rand_blocks.append(num_rand_blocks - (num_rand_blocks // 2)) # append 3 - 1 = 2
         else:
             plan_from_length.append(from_seq_length)
             plan_num_rand_blocks.append(num_rand_blocks)
@@ -703,13 +712,13 @@ class BigBirdBlockSparseAttention(nn.Module):
 
     def _bigbird_block_rand_mask_with_head(
         self,
-        from_seq_length,
-        to_seq_length,
-        from_block_size,
-        to_block_size,
-        num_heads,
-        plan_from_length,
-        plan_num_rand_blocks,
+        from_seq_length, # 100
+        to_seq_length, # 100
+        from_block_size, # 10
+        to_block_size, # 10
+        num_heads, # 16
+        plan_from_length, # [80, 100]
+        plan_num_rand_blocks, # [1, 2]
         window_block_left=1,
         window_block_right=1,
         global_block_top=1,
@@ -737,20 +746,19 @@ class BigBirdBlockSparseAttention(nn.Module):
             adjacency list of size num_head where each element is of size from_seq_length//from_block_size-2 by
             num_rand_blocks
         """
-        # using this method when from_seq_length not in [1024, 3072, 4096]
-
-        if from_seq_length // from_block_size != to_seq_length // to_block_size:
-            raise ValueError("Error the number of blocks needs to be same!")
-
-        if from_seq_length not in plan_from_length:
-            raise ValueError("Error from sequence length not in plan!")
 
         # Total number of blocks in the mmask
         num_blocks = from_seq_length // from_block_size
+        # num_blocks = 100 // 10 = 10
+
         # Number of blocks per plan
         plan_block_length = np.array(plan_from_length) // from_block_size
+        # plan_block_length = [8, 10]
+
         # till when to follow plan
         max_plan_idx = plan_from_length.index(from_seq_length)
+        # max_plan_idx = 1
+
         # Random Attention adjacency list
         rand_attn = [
             np.zeros((num_blocks, np.sum(plan_num_rand_blocks[: max_plan_idx + 1])), dtype=np.int32)
