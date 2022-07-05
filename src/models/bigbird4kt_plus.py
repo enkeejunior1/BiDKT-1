@@ -1,5 +1,3 @@
-from transformers.models.longformer.modeling_longformer import LongformerSelfAttention
-
 import torch
 import torch.nn as nn
 
