@@ -135,7 +135,8 @@ def get_models(num_q, num_r, num_pid, device, config):
             max_seq_len=config.max_seq_len,
             device=device,
             use_leakyrelu=config.use_leakyrelu,
-            dropout_p=config.dropout_p,
+            config=config,
+            dropout_p=config.dropout_p
         ).to(device)
     elif config.model_name == "bert4kt_plus_time":
         model = Bert4ktPlusTime(
@@ -163,7 +164,7 @@ def get_models(num_q, num_r, num_pid, device, config):
             max_seq_len=config.max_seq_len,
             device=device,
             use_leakyrelu=config.use_leakyrelu,
-            dropout_p=config.dropout_p,
+            dropout_p=config.dropout_p
         ).to(device)
     else:
         print("Wrong model_name was used...")
