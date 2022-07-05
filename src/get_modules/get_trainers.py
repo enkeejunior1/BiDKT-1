@@ -6,6 +6,9 @@ from trainers.ma_bert4kt_plus_trainer import MonotonicBert4ktPlusTrainer
 from trainers.bcaa_kt_trainer import BcaaKtTrainer
 from trainers.nma_bert4kt_dualenc_kr_trainer import NmaBert4ktDualencKrTrainer
 from trainers.ma_bert4kt_dualenc_kr_trainer import MaBert4ktDualencKrTrainer
+from trainers.bigbird4kt_plus_trainer import Bigbird4ktPlusTrainer
+from trainers.bert4kt_plus_time_trainer import Bert4ktPlusTimeTrainer
+from trainers.convbert4kt_plus_trainer import ConvBert4ktPlusTrainer
 
 def get_trainers(model, optimizer, device, num_q, crit, config):
 
@@ -96,6 +99,42 @@ def get_trainers(model, optimizer, device, num_q, crit, config):
         )
     elif config.model_name == "bcaa_kt":
         trainer = BcaaKtTrainer(
+            model=model,
+            optimizer=optimizer,
+            n_epochs=config.n_epochs,
+            device=device,
+            num_q=num_q,
+            crit=crit,
+            max_seq_len=config.max_seq_len,
+            grad_acc=config.grad_acc,
+            grad_acc_iter=config.grad_acc_iter
+        )
+    elif config.model_name == "bigbird4kt_plus":
+        trainer = Bigbird4ktPlusTrainer(
+            model=model,
+            optimizer=optimizer,
+            n_epochs=config.n_epochs,
+            device=device,
+            num_q=num_q,
+            crit=crit,
+            max_seq_len=config.max_seq_len,
+            grad_acc=config.grad_acc,
+            grad_acc_iter=config.grad_acc_iter
+        )
+    elif config.model_name == "bert4kt_plus_time":
+        trainer = Bert4ktPlusTimeTrainer(
+            model=model,
+            optimizer=optimizer,
+            n_epochs=config.n_epochs,
+            device=device,
+            num_q=num_q,
+            crit=crit,
+            max_seq_len=config.max_seq_len,
+            grad_acc=config.grad_acc,
+            grad_acc_iter=config.grad_acc_iter
+        )
+    elif config.model_name == "convbert4kt_plus":
+        trainer = ConvBert4ktPlusTrainer(
             model=model,
             optimizer=optimizer,
             n_epochs=config.n_epochs,
