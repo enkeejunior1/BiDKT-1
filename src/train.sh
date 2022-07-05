@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pid_datasets="assist2009_pid assist2012_pid assist2017_pid algebra2005_pid algebra2006_pid"
+pid_datasets="assist2009_pid assist2017_pid algebra2005_pid algebra2006_pid assist2012_pid"
 
 for pid_dataset in ${pid_datasets}
 do

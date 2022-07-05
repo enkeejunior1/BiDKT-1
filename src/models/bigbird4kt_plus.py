@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 from matplotlib.style import context
->>>>>>> 6fadbc25fed04a4186204cdae713e75af8968644
 import torch
 import torch.nn as nn
 
