@@ -33,7 +33,7 @@ def define_argparser():
 
     # bigberd4kt's arguments
     p.add_argument('--num_random_blocks', type=int, default=3)#num_random_blocks = 3 
-    p.add_argument('--block_size', type=int, default=10)#block_size = 64(원문)
+    p.add_argument('--block_size', type=int, default=5)#block_size = 64(원문)
 
     # grad_accumulation
     p.add_argument('--grad_acc', type=bool, default=False)

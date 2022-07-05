@@ -15,7 +15,7 @@ class BigBirdBlockSparseAttention(nn.Module):
         self.seed = seed # 42
         self.num_attention_heads = n_splits # 16
         self.num_random_blocks = config.num_random_blocks # 3
-        self.block_size = config.block_size # 10
+        self.block_size = config.block_size # 5
 
         self.attention_head_size = int(hidden_size / n_splits) # 512/16 = 32
         self.all_head_size = self.num_attention_heads * self.attention_head_size # 16 * 32 = 512
@@ -49,7 +49,7 @@ class BigBirdBlockSparseAttention(nn.Module):
         to_seq_length = from_seq_length = seqlen
         # to_seq_length = from_seq_length = seqlen = sq = 100
         from_block_size = to_block_size = self.block_size
-        # from_block_size = to_block_size = self.block_size = 10
+        # from_block_size = to_block_size = self.block_size = 5
 
         # from_seq_length % from_block_size == 0
         # to_seq_length % to_block_size == 0
@@ -74,8 +74,8 @@ class BigBirdBlockSparseAttention(nn.Module):
             self.num_attention_heads, # 16
             self.num_random_blocks, # 3
             self.attention_head_size, # 32
-            from_block_size, # 10
-            to_block_size, # 10
+            from_block_size, # 5
+            to_block_size, # 5
             batch_size, # bs
             from_seq_length, # 100
             to_seq_length, # 100
@@ -162,7 +162,8 @@ class BigBirdBlockSparseAttention(nn.Module):
             plan_from_length=plan_from_length, # [80, 100]
             plan_num_rand_blocks=plan_num_rand_blocks, # [1, 2]
         )
-        # rand_attn
+        # len(rand_attn) = 16
+        # rand_attn[0].shape = (18, 3)
 
         rand_attn = np.stack(rand_attn, axis=0)
         rand_attn = torch.tensor(rand_attn, device=query_layer.device, dtype=torch.long)
@@ -761,14 +762,27 @@ class BigBirdBlockSparseAttention(nn.Module):
 
         # Random Attention adjacency list
         rand_attn = [
-            np.zeros((num_blocks, np.sum(plan_num_rand_blocks[: max_plan_idx + 1])), dtype=np.int32)
-            for i in range(num_heads)
+            np.zeros(
+                (
+                    num_blocks, # 10
+                    np.sum(
+                        # plan_num_rand_blocks = [1, 2]
+                        plan_num_rand_blocks[: max_plan_idx + 1] # max_plan_idx = 1
+                        )
+                    # np.sum() => 3
+                ), dtype=np.int32)
+            # np.zeros(10, 3)
+            for i in range(num_heads) # num_heads = 16
         ]
+        # np.zeros(10, 3)을 16개 생성해서 리스트에 담음
+        # len(rand_attn) = 16        
 
         # We will go iteratively over the plan blocks and pick random number of
         # Attention blocks from the legally allowed blocks
-        for plan_idx in range(max_plan_idx + 1):
+        for plan_idx in range(max_plan_idx + 1): # range(2)
             rnd_r_cnt = 0
+
+            # 두번째 for iter부터 적용
             if plan_idx > 0:
                 # set the row for all from_blocks starting from 0 to
                 # plan_block_length[plan_idx-1]
@@ -814,25 +828,40 @@ class BigBirdBlockSparseAttention(nn.Module):
 
             if plan_num_rand_blocks[plan_idx] == 0:
                 continue
-            curr_r_cnt = int(np.sum(plan_num_rand_blocks[: plan_idx + 1]))
+            # 가장 처음 idx는 0이므로, 첫번째는 여기부터 시작
+            curr_r_cnt = int(np.sum(
+                plan_num_rand_blocks[: plan_idx + 1])
+                # 첫번째 iter: plan_idx는 0이므로, plan_num_rand_blocks[:1] = 1
+                )
+            # 첫번째 iter: curr_r_cnt = 1
+
             from_start_block_id = global_block_top
+            # from_start_block_id = 1
+
             to_start_block_id = 0
+
+            # 두번째부터 적용
             if plan_idx > 0:
                 rnd_r_cnt = int(np.sum(plan_num_rand_blocks[:plan_idx]))
                 from_start_block_id = plan_block_length[plan_idx - 1]
                 to_start_block_id = plan_block_length[plan_idx - 1]
 
+            # plan_block_length = [8, 10]
+            # 첫번째 iter: range(1, 8), plan_block_length[plan_idx] = 8, 1부터 7까지 반복
             for blk_rw_idx in range(from_start_block_id, plan_block_length[plan_idx]):
-                for h in range(num_heads):
-                    rand_attn[h][blk_rw_idx, rnd_r_cnt:curr_r_cnt] = self._get_single_block_row_attention(
-                        block_id=blk_rw_idx,
-                        to_start_block_id=to_start_block_id,
-                        to_end_block_id=plan_block_length[plan_idx],
-                        num_rand_blocks=plan_num_rand_blocks[plan_idx],
-                        window_block_left=window_block_left,
-                        window_block_right=window_block_right,
-                        global_block_left=global_block_left,
-                        global_block_right=global_block_right,
+                # np.zeros(10, 3)을 16개 생성해서 리스트에 담음, len(rand_attn) = 16
+                for h in range(num_heads): #range(16)
+                    # 첫 iter: rand_attn[0][1, 0:1]
+                    #For a single row block get random row attention.
+                    rand_attn[h][blk_rw_idx, rnd_r_cnt:curr_r_cnt] = self._get_single_block_row_attention( 
+                        block_id=blk_rw_idx, # 첫번째 iter: 1
+                        to_start_block_id=to_start_block_id, # 첫번째 iter: 0
+                        to_end_block_id=plan_block_length[plan_idx], # 첫번째 iter: plan_block_length[0] = 8
+                        num_rand_blocks=plan_num_rand_blocks[plan_idx], # 첫번째 iter: plan_num_rand_blocks[0] = 1
+                        window_block_left=window_block_left, # 첫번째 iter: 1
+                        window_block_right=window_block_right, # 첫번째 iter: 1
+                        global_block_left=global_block_left, # 첫번째 iter: 1
+                        global_block_right=global_block_right, # 첫번째 iter: 1
                     )
 
         for nh in range(num_heads):
