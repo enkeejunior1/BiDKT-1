@@ -139,6 +139,8 @@ class ConvBertSelfAttention(nn.Module):
         self.unfold = nn.Unfold(
             kernel_size=[self.conv_kernel_size, 1], padding=[int((self.conv_kernel_size - 1) / 2), 0]
         )
+        
+        self.gammas = nn.Parameter(torch.zeros(self.num_attention_heads, 1, 1))
 
         self.dropout = nn.Dropout(dropout_p)
 
@@ -219,7 +221,7 @@ class ConvBertSelfAttention(nn.Module):
         #############
         # dist func #
         #############
-        total_effect = self.dist_func(attention_scores, mask)
+        total_effect = self.dist_func(attention_scores, mask, self.gammas)
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
         attention_scores = attention_scores * total_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
@@ -267,7 +269,7 @@ class ConvBertSelfAttention(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def dist_func(self, attention_scores, mask):
+    def dist_func(self, attention_scores, mask, gamma):
 
         scores = attention_scores
         bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
