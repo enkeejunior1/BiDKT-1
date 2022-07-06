@@ -104,8 +104,8 @@ class BigBirdBlockSparseAttention(nn.Module):
         n_heads, # 16
         n_rand_blocks, # 3
         attention_head_size, # 32
-        from_block_size, # 10
-        to_block_size, # 10
+        from_block_size, # 5
+        to_block_size, # 5
         batch_size, # bs
         from_seq_len, # 100
         to_seq_len, # 100
@@ -163,16 +163,28 @@ class BigBirdBlockSparseAttention(nn.Module):
             plan_num_rand_blocks=plan_num_rand_blocks, # [1, 2]
         )
         # len(rand_attn) = 16
-        # rand_attn[0].shape = (18, 3)
+        # rand_attn[0].shape = (18, 3) -> [[5 8 4], [9 6 7], ... [4 2 5]]
 
         rand_attn = np.stack(rand_attn, axis=0)
+        # |rand_attn| = (16, 18, 3), numpy array
         rand_attn = torch.tensor(rand_attn, device=query_layer.device, dtype=torch.long)
+        # |rand_attn| = (16, 18, 3), torch.tensor
         rand_attn.unsqueeze_(0)
+        # |rand_attn| = (1, 16, 18, 3), torch.tensor
         rand_attn = torch.cat([rand_attn for _ in range(batch_size)], dim=0)
+        # |rand_attn| = (bs, 16, 18, 3), torch.tensor
 
         rand_mask = self._create_rand_mask_from_inputs(
-            from_blocked_mask, to_blocked_mask, rand_attn, n_heads, n_rand_blocks, bsz, from_seq_len, from_block_size
+            from_blocked_mask, # None
+            to_blocked_mask, # None
+            rand_attn, # |rand_attn| = (bs, 16, 18, 3)
+            n_heads, # 16
+            n_rand_blocks, # 3
+            bsz, # bs
+            from_seq_len, # 100
+            from_block_size # 5
         )
+        # 여기서 문제 발생
 
         blocked_query_matrix = query_layer.view(bsz, n_heads, from_seq_len // from_block_size, from_block_size, -1)
         blocked_key_matrix = key_layer.view(bsz, n_heads, to_seq_len // to_block_size, to_block_size, -1)
@@ -585,24 +597,21 @@ class BigBirdBlockSparseAttention(nn.Module):
 
     @staticmethod
     def _create_rand_mask_from_inputs(
-        from_blocked_mask,
-        to_blocked_mask,
-        rand_attn,
-        num_attention_heads,
-        num_rand_blocks,
-        batch_size,
-        from_seq_length,
-        from_block_size,
+        from_blocked_mask, # None
+        to_blocked_mask, # None
+        rand_attn, # |rand_attn| = (bs, 16, 18, 3)
+        num_attention_heads, # 16
+        num_rand_blocks, # 3
+        batch_size, # bs
+        from_seq_length, # 100
+        from_block_size, # 5
     ):
         """
         Create 3D attention mask from a 2D tensor mask.
         Args:
-            from_blocked_mask: 2D Tensor of shape [batch_size,
-            from_seq_length//from_block_size, from_block_size].
-            to_blocked_mask: int32 Tensor of shape [batch_size,
-            to_seq_length//to_block_size, to_block_size].
-            rand_attn: [batch_size, num_attention_heads,
-            from_seq_length//from_block_size-2, num_rand_blocks]
+            from_blocked_mask: 2D Tensor of shape [batch_size, from_seq_length//from_block_size, from_block_size].
+            to_blocked_mask: int32 Tensor of shape [batch_size, to_seq_length//to_block_size, to_block_size].
+            rand_attn: [batch_size, num_attention_heads, from_seq_length//from_block_size-2, num_rand_blocks]
             num_attention_heads: int. Number of attention heads.
             num_rand_blocks: int. Number of random chunks per row.
             batch_size: int. Batch size for computation.
@@ -612,8 +621,14 @@ class BigBirdBlockSparseAttention(nn.Module):
             float Tensor of shape [batch_size, num_attention_heads, from_seq_length//from_block_size-2,
             from_block_size, num_rand_blocks*to_block_size].
         """
-        num_windows = from_seq_length // from_block_size - 2
+        num_windows = from_seq_length // from_block_size - 2 # 100 // 5 - 2 = 18
+        # num_windows = 18
+        
+        # |to_blocked_mask| = (bs, to_seq_length//to_block_size, to_block_size)
+        # |rand_attn| = (bs, 16, 18, 3)
         rand_mask = torch.stack([p1[i1.flatten()] for p1, i1 in zip(to_blocked_mask, rand_attn)])
+        # |rand_mask| = ()
+        print("rand_mask", rand_mask)
         rand_mask = rand_mask.view(batch_size, num_attention_heads, num_windows, num_rand_blocks * from_block_size)
         rand_mask = torch.einsum("blq,bhlk->bhlqk", from_blocked_mask[:, 1:-1], rand_mask)
         return rand_mask
