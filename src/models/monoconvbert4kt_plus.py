@@ -4,73 +4,6 @@ import numpy as np
 import math
 import torch.nn.functional as F
 
-# monotonic attn을 추가한 convBERT attn
-def monotonic_attention(q, k, v, d_k, mask, dropout, gamma=None):
-    """
-    This is called by MultiHeadAttention object to find the values.
-    """
-    scores = torch.matmul(q, k.transpose(-2, -1)) / np.sqrt(
-        d_k
-    )  # [batch_size, 8, seq_len, seq_len]
-    bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
-
-    x1 = torch.arange(seqlen).expand(seqlen, -1)
-    x2 = x1.transpose(0, 1).contiguous()
-
-    with torch.no_grad():
-        scores_ = scores.masked_fill(mask == 0, -1e32)
-        scores_ = F.softmax(scores_, dim=-1)  # [batch_size, 8, seqlen, seqlen]
-        scores_ = scores_ * mask.float()
-
-        # [batch_size, 8, seqlen, seqlen]
-        distcum_scores = torch.cumsum(scores_, dim=-1)
-        # [batch_size, 8, seqlen, 1]
-        disttotal_scores = torch.sum(scores_, dim=-1, keepdim=True)
-        """
-        >>> x1-x2
-            tensor([[ 0,  1,  2,  3,  4],
-                    [-1,  0,  1,  2,  3],
-                    [-2, -1,  0,  1,  2],
-                    [-3, -2, -1,  0,  1],
-                    [-4, -3, -2, -1,  0]])
-
-        >>> torch.abs(x1-x2)
-            tensor([[0, 1, 2, 3, 4],
-                    [1, 0, 1, 2, 3],
-                    [2, 1, 0, 1, 2],
-                    [3, 2, 1, 0, 1],
-                    [4, 3, 2, 1, 0]])
-        """
-        device = distcum_scores.get_device()
-        position_effect = torch.abs(x1 - x2)[None, None, :, :].type(
-            torch.FloatTensor
-        )  # [1, 1, seqlen, seqlen]
-        position_effect = position_effect.to(device)
-        # [batch_size, 8, seqlen, seqlen] positive distance
-        # dist_score => d(t, tau)
-        dist_scores = torch.clamp(
-            (disttotal_scores - distcum_scores) * position_effect, min=0.0
-        )
-        dist_scores = dist_scores.sqrt().detach()
-
-    m = nn.Softplus()
-    # 1,8,1,1  gamma is \theta in the paper (learnable decay rate parameter)
-    gamma = -1.0 * m(gamma).unsqueeze(0)
-    # Now after do exp(gamma*distance) and then clamp to 1e-5 to 1e-5
-    total_effect = torch.clamp(
-        torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
-    )
-
-    scores = scores * total_effect
-
-    scores.masked_fill_(mask == 0, -1e32)
-    scores = F.softmax(scores, dim=-1)  # [batch_size, 8, seq_len, seq_len]
-    attn = scores
-
-    scores = dropout(scores)
-    output = torch.matmul(scores, v)
-    return output, attn
-
 # SeparableConv1D
 class SeparableConv1D(nn.Module):
     def __init__(self, input_filters, output_filters, kernel_size):
@@ -100,7 +33,7 @@ class SeparableConv1D(nn.Module):
         return x
 
 # huggingface conv bert
-class ConvBertSelfAttention(nn.Module):
+class MonotonicConvBertSelfAttention(nn.Module):
     # hidden % n_splits == 0
     def __init__(self, hidden_size, n_splits, dropout_p, head_ratio=2, conv_kernel_size=9):
         super().__init__()
@@ -369,7 +302,7 @@ class EncoderBlock(nn.Module):
 
         self.use_leakyrelu = use_leakyrelu
 
-        self.attn = ConvBertSelfAttention(hidden_size, n_splits, dropout_p)
+        self.attn = MonotonicConvBertSelfAttention(hidden_size, n_splits, dropout_p)
         self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
         self.attn_dropout = nn.Dropout(dropout_p)
 
