@@ -242,7 +242,8 @@ class EncoderBlock(nn.Module):
 
         self.fc = nn.Sequential(
             nn.Linear(hidden_size, hidden_size * 4),
-            nn.LeakyReLU() if self.use_leakyrelu else nn.GELU(),
+            nn.LeakyReLU() if self.use_leakyrelu else self.gelu(),
+            #nn.LeakyReLU() if self.use_leakyrelu else nn.GELU(),
             nn.Linear(hidden_size * 4, hidden_size),
         )
         self.fc_norm = nn.LayerNorm(hidden_size)
@@ -267,6 +268,18 @@ class EncoderBlock(nn.Module):
         # |z| = (bs, n, hs)
 
         return z, mask
+
+    # upstage's gelu
+    def gelu(x):
+        """Upstage said:
+            Implementation of the gelu activation function.
+            For information: OpenAI GPT's gelu is slightly different
+            (and gives slightly different results):
+            0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) *
+            (x + 0.044715 * torch.pow(x, 3))))
+            Also see https://arxiv.org/abs/1606.08415
+        """
+        return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
 
 class MySequential(nn.Sequential):

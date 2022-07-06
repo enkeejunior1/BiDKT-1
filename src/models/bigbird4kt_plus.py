@@ -185,6 +185,7 @@ class BigBirdBlockSparseAttention(nn.Module):
             from_block_size # 5
         )
         # 여기서 문제 발생
+        # to_blocked_mask에 어떤 값이 들어가야하는지?? 이것이 중요
 
         blocked_query_matrix = query_layer.view(bsz, n_heads, from_seq_len // from_block_size, from_block_size, -1)
         blocked_key_matrix = key_layer.view(bsz, n_heads, to_seq_len // to_block_size, to_block_size, -1)
@@ -624,9 +625,11 @@ class BigBirdBlockSparseAttention(nn.Module):
         num_windows = from_seq_length // from_block_size - 2 # 100 // 5 - 2 = 18
         # num_windows = 18
         
-        # |to_blocked_mask| = (bs, to_seq_length//to_block_size, to_block_size)
+        # |to_blocked_mask| = (bs, to_seq_length//to_block_size, to_block_size) = (bs, 100//5, 5) = (bs, 20, 5)
         # |rand_attn| = (bs, 16, 18, 3)
-        rand_mask = torch.stack([p1[i1.flatten()] for p1, i1 in zip(to_blocked_mask, rand_attn)])
+        rand_mask = torch.stack(
+            [p1[i1.flatten()] for p1, i1 in zip(to_blocked_mask, rand_attn)]
+            )
         # |rand_mask| = ()
         print("rand_mask", rand_mask)
         rand_mask = rand_mask.view(batch_size, num_attention_heads, num_windows, num_rand_blocks * from_block_size)
