@@ -10,6 +10,7 @@ from trainers.bigbird4kt_plus_trainer import Bigbird4ktPlusTrainer
 from trainers.bert4kt_plus_time_trainer import Bert4ktPlusTimeTrainer
 from trainers.convbert4kt_plus_trainer import ConvBert4ktPlusTrainer
 from trainers.monoconvbert4kt_plus_trainer import MonoConvBert4ktPlusTrainer
+from trainers.forgetting_monoconvbert4kt_plus_trainer import ForgettingMonoConvBert4ktPlusTrainer
 
 def get_trainers(model, optimizer, device, num_q, crit, config):
 
@@ -148,6 +149,18 @@ def get_trainers(model, optimizer, device, num_q, crit, config):
         )
     elif config.model_name == "monoconvbert4kt_plus":
         trainer = MonoConvBert4ktPlusTrainer(
+            model=model,
+            optimizer=optimizer,
+            n_epochs=config.n_epochs,
+            device=device,
+            num_q=num_q,
+            crit=crit,
+            max_seq_len=config.max_seq_len,
+            grad_acc=config.grad_acc,
+            grad_acc_iter=config.grad_acc_iter
+        )
+    elif config.model_name == "forgetting_monoconvbert4kt_plus":
+        trainer = ForgettingMonoConvBert4ktPlusTrainer(
             model=model,
             optimizer=optimizer,
             n_epochs=config.n_epochs,

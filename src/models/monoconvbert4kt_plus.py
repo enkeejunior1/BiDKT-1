@@ -156,8 +156,11 @@ class MonotonicConvBertSelfAttention(nn.Module):
         #############
         total_effect = self.dist_func(attention_scores, mask, self.gammas)
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+
         attention_scores = attention_scores * total_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+
+        #print('a', attention_scores)
 
         # |mask| = (bs, n)
         attention_mask = self.get_extended_attention_mask(mask)
@@ -165,8 +168,13 @@ class MonotonicConvBertSelfAttention(nn.Module):
         # 기존 코드에서는 원하는 위치는 0, 마스크 위치에는 -10000.0을 두어서 처리하려 함
         # attention_scores = attention_scores + attention_mask
         # 여기서는 attention_mask를 아래처럼 처리함
-        attention_scores.masked_fill_(attention_mask, -1e8)
+
+        print("attention_mask", attention_mask)
+
+        attention_scores = attention_scores.masked_fill_(attention_mask, -1e8) # 그냥 mask를 -100000으로 더하기
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+
+        #print("attention_scores", attention_scores)
 
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
         # |attention_probs| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
@@ -211,7 +219,10 @@ class MonotonicConvBertSelfAttention(nn.Module):
         x2 = x1.transpose(0, 1).contiguous()
 
         attention_mask = self.get_extended_attention_mask(mask)
-        scores_ = scores.masked_fill_(attention_mask, -1e8)
+
+        scores_ = scores.masked_fill_(attention_mask == 0, -1e8)
+        masked_scores = scores.masked_fill_(attention_mask == 0, -1e8)
+
         scores_ = F.softmax(scores_, dim=-1)  # (batch_size, 8, sq, sq)
         scores_ = scores_ * attention_mask.float()
 
@@ -254,7 +265,7 @@ class MonotonicConvBertSelfAttention(nn.Module):
             torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
         )
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-        return total_effect
+        return total_effect, masked_scores
 
     @torch.no_grad()
     def get_extended_attention_mask(self, mask):

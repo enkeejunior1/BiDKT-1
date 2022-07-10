@@ -10,6 +10,7 @@ from models.bigbird4kt_plus import Bigbird4ktPlus
 from models.bert4kt_plus_time import Bert4ktPlusTime
 from models.convbert4kt_plus import ConvBert4ktPlus
 from models.monoconvbert4kt_plus import MonoConvBert4ktPlus
+from models.forgetting_monoconvbert4kt_plus import ForgettingMonoConvBert4ktPlus
 
 def get_models(num_q, num_r, num_pid, device, config):
 
@@ -169,6 +170,20 @@ def get_models(num_q, num_r, num_pid, device, config):
         ).to(device)
     elif config.model_name == "monoconvbert4kt_plus":
         model = MonoConvBert4ktPlus(
+            num_q=num_q,
+            num_r=num_r,
+            num_pid=num_pid,
+            hidden_size=config.hidden_size,
+            output_size=config.output_size,
+            num_head=config.num_head,
+            num_encoder=config.num_encoder,
+            max_seq_len=config.max_seq_len,
+            device=device,
+            use_leakyrelu=config.use_leakyrelu,
+            dropout_p=config.dropout_p
+        ).to(device)
+    elif config.model_name == "forgetting_monoconvbert4kt_plus":
+        model = ForgettingMonoConvBert4ktPlus(
             num_q=num_q,
             num_r=num_r,
             num_pid=num_pid,

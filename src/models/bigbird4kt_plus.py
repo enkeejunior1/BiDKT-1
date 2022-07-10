@@ -941,7 +941,6 @@ class BigBirdBlockSparseAttention(nn.Module):
                 break
         return np.array(selected_random_blokcs, dtype=np.int32)
 
-
 class EncoderBlock(nn.Module):
 
     def __init__(
