@@ -169,12 +169,8 @@ class MonotonicConvBertSelfAttention(nn.Module):
         # attention_scores = attention_scores + attention_mask
         # 여기서는 attention_mask를 아래처럼 처리함
 
-        print("attention_mask", attention_mask)
-
-        attention_scores = attention_scores.masked_fill_(attention_mask, -1e8) # 그냥 mask를 -100000으로 더하기
+        attention_scores = attention_scores.masked_fill_(attention_mask==0, -1e8) # 그냥 mask를 -100000으로 더하기
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-
-        #print("attention_scores", attention_scores)
 
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
         # |attention_probs| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
@@ -265,7 +261,7 @@ class MonotonicConvBertSelfAttention(nn.Module):
             torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
         )
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-        return total_effect, masked_scores
+        return total_effect
 
     @torch.no_grad()
     def get_extended_attention_mask(self, mask):
