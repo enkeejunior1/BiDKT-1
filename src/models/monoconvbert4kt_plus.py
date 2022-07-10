@@ -217,7 +217,6 @@ class MonotonicConvBertSelfAttention(nn.Module):
         attention_mask = self.get_extended_attention_mask(mask)
 
         scores_ = scores.masked_fill_(attention_mask == 0, -1e8)
-        masked_scores = scores.masked_fill_(attention_mask == 0, -1e8)
 
         scores_ = F.softmax(scores_, dim=-1)  # (batch_size, 8, sq, sq)
         scores_ = scores_ * attention_mask.float()
@@ -261,6 +260,7 @@ class MonotonicConvBertSelfAttention(nn.Module):
             torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
         )
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+
         return total_effect
 
     @torch.no_grad()

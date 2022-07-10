@@ -16,6 +16,9 @@ from dataloaders.algebra2005_pid_loader import ALGEBRA2005_PID
 from dataloaders.algebra2006_pid_loader import ALGEBRA2006_PID
 from dataloaders.slepemapy_pid_loader import SLEPEMAPY_PID
 from dataloaders.algebra2005_pid_time_loader import ALGEBRA2005_PID_Time
+from dataloaders.algebra2006_pid_time_loader import ALGEBRA2006_PID_Time
+from dataloaders.assist2012_pid_time_loader import ASSIST2012_PID_Time
+from dataloaders.assist2017_pid_time_loader import ASSIST2017_PID_Time
 
 #get_loaders를 따로 만들고, 이 함수를 train에서 불러내기
 def get_loaders(config, idx=None):
@@ -113,6 +116,24 @@ def get_loaders(config, idx=None):
         collate = pid_collate_fn
     elif config.dataset_name == "algebra2005_pid_time":
         dataset = ALGEBRA2005_PID_Time(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+        collate = pid_time_collate_fn #시간까지 추출
+    elif config.dataset_name == "algebra2006_pid_time":
+        dataset = ALGEBRA2006_PID_Time(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+        collate = pid_time_collate_fn #시간까지 추출
+    elif config.dataset_name == "assist2012_pid_time":
+        dataset = ASSIST2012_PID_Time(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+        collate = pid_time_collate_fn #시간까지 추출
+    elif config.dataset_name == "assist2017_pid_time":
+        dataset = ASSIST2017_PID_Time(config.max_seq_len)
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid

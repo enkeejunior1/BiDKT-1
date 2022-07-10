@@ -155,7 +155,7 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         #############
         # dist func #
         #############
-        total_effect = self.dist_func(attention_scores, td, mask, self.gammas)
+        total_effect = self.dist_func(td, mask, self.gammas)
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
         attention_scores = attention_scores * total_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
@@ -166,7 +166,7 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         # 기존 코드에서는 원하는 위치는 0, 마스크 위치에는 -10000.0을 두어서 처리하려 함
         # attention_scores = attention_scores + attention_mask
         # 여기서는 attention_mask를 아래처럼 처리함
-        attention_scores.masked_fill_(attention_mask, -1e8)
+        attention_scores.masked_fill_(attention_mask == 0, -1e8)
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
@@ -203,10 +203,11 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def dist_func(self, attention_scores, td, mask, gamma):
+    def dist_func(self, td, mask, gamma):
 
-        attention_td = self.get_extended_attention_td(td)
-        scores = attention_td.float()
+        td = F.normalize(td, dim=-1)
+
+        scores = self.get_extended_attention_td(td)
         #|scores| = (bs, n_attn_head, n, n)
 
         bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
@@ -218,18 +219,14 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
 
         scores_ = scores.masked_fill_(attention_mask == 0, -1e4)
 
-        print("scores", scores_)
-
-        scores_ = F.softmax(scores_.float(), dim=-1)  # (batch_size, 8, sq, sq)
-
-        #print("score_", scores_)
-
-        scores_ = scores_ * attention_mask.float()
+        scores_ = F.softmax(scores_, dim=-1)
 
         # [batch_size, 8, seqlen, seqlen]
         distcum_scores = torch.cumsum(scores_, dim=-1)
+
         # [batch_size, 8, seqlen, 1]
         disttotal_scores = torch.sum(scores_, dim=-1, keepdim=True)
+
         """
         >>> x1-x2
             tensor([[ 0,  1,  2,  3,  4],
@@ -265,6 +262,7 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
             torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
         )
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+
         return total_effect
 
     @torch.no_grad()

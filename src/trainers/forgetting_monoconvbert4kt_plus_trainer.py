@@ -151,7 +151,7 @@ class ForgettingMonoConvBert4ktPlusTrainer():
                 q_seqs.long(), 
                 mlm_r_seqs.long(), # train을 위한 mlm된 r_seqs
                 pid_seqs.long(),
-                time_seqs.long(),
+                time_seqs.float(),
                 mask_seqs.long() # attn_mask
             ).to(self.device)
             # |y_hat| = (bs, n, output_size=1)
@@ -226,7 +226,7 @@ class ForgettingMonoConvBert4ktPlusTrainer():
                     q_seqs.long(),
                     mlm_r_seqs.long(),
                     pid_seqs.long(),
-                    time_seqs.long(),
+                    time_seqs.float(),
                     mask_seqs.long()
                 ).to(self.device)
 
@@ -285,7 +285,7 @@ class ForgettingMonoConvBert4ktPlusTrainer():
                     q_seqs.long(),
                     mlm_r_seqs.long(),
                     pid_seqs.long(),
-                    time_seqs.long(),
+                    time_seqs.float(),
                     mask_seqs.long()
                 ).to(self.device)
 
