@@ -260,7 +260,7 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         td_scores_ = torch.clamp(
             torch.clamp((td_scores_ * gamma).exp(), min=1e-5), max=1e5
         )        
-        td_effect = (td_scores_ * scores_masking) + upper_tri_mat
+        td_effect = (td_scores_ * scores_masking) # + upper_tri_mat
 
         # total_effect - td_effect
         total_effect = total_effect - td_effect
