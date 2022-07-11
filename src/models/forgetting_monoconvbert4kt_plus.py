@@ -256,14 +256,12 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         upper_tri_mat = np.triu(upper_tri_mat)
         scores_masking = torch.FloatTensor((upper_tri_mat == 0)).to(td_device)
         upper_tri_mat = torch.FloatTensor(upper_tri_mat).to(td_device)
+    
+        td_effect = (-1.0 * td_scores_) * scores_masking # + upper_tri_mat
+        # 윗 삼각행렬이 0인 상태로 더해줘야 함
 
-        td_scores_ = torch.clamp(
-            torch.clamp((td_scores_ * gamma).exp(), min=1e-5), max=1e5
-        )        
-        td_effect = (td_scores_ * scores_masking) # + upper_tri_mat
-
-        # total_effect - td_effect
-        total_effect = total_effect - td_effect
+        # total_effect + td_effect(이미 -값이므로)
+        total_effect = total_effect + td_effect
 
         return total_effect
 
