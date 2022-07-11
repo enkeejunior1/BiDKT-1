@@ -153,11 +153,19 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         #############
-        # dist func #
+        # forgetting_func #
         #############
-        total_effect = self.dist_func(attention_scores, td, mask, self.gammas)
+
+        m = nn.Softplus()
+        # 1,8,1,1  gamma is \theta in the paper (learnable decay rate parameter)
+        gamma = -1.0 * m(self.gammas).unsqueeze(0)
+        td_scores = self.forgetting_func(td, mask)
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-        attention_scores = attention_scores * total_effect
+        td_effect = torch.clamp(
+            torch.clamp((td_scores * gamma).exp(), min=1e-5), max=1e5
+        )
+
+        attention_scores = attention_scores * td_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         # |mask| = (bs, n)
@@ -166,7 +174,7 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         # 기존 코드에서는 원하는 위치는 0, 마스크 위치에는 -10000.0을 두어서 처리하려 함
         # attention_scores = attention_scores + attention_mask
         # 여기서는 attention_mask를 아래처럼 처리함
-        attention_scores.masked_fill_(attention_mask, -1e8)
+        attention_scores.masked_fill_(attention_mask == 0, -1e8)
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
@@ -203,69 +211,38 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def dist_func(self, attention_scores, td, mask, gamma):
+    def forgetting_func(self, td, mask):
 
-        attention_td = self.get_extended_attention_td(td)
-        scores = attention_td.float()
+        attention_mask = self.get_extended_attention_mask(mask)
+       
+        td = F.normalize(td, dim=-1)
+        td_scores = self.get_extended_attention_td(td)
         #|scores| = (bs, n_attn_head, n, n)
+        bs, head, seqlen = td_scores.size(0), td_scores.size(1), td_scores.size(2)
+        td_scores_ = td_scores.masked_fill_(attention_mask == 0, -1e4)
+        td_scores_ = F.softmax(td_scores_, dim=-1)
+        #|scores_| = (bs, n_attn_head, n, n)
 
-        bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
+        device = td_scores_.get_device()
 
         x1 = torch.arange(seqlen).expand(seqlen, -1)
         x2 = x1.transpose(0, 1).contiguous()
 
-        attention_mask = self.get_extended_attention_mask(mask)
-
-        scores_ = scores.masked_fill_(attention_mask == 0, -1e4)
-
-        print("scores", scores_)
-
-        scores_ = F.softmax(scores_.float(), dim=-1)  # (batch_size, 8, sq, sq)
-
-        #print("score_", scores_)
-
-        scores_ = scores_ * attention_mask.float()
-
-        # [batch_size, 8, seqlen, seqlen]
-        distcum_scores = torch.cumsum(scores_, dim=-1)
-        # [batch_size, 8, seqlen, 1]
-        disttotal_scores = torch.sum(scores_, dim=-1, keepdim=True)
-        """
-        >>> x1-x2
-            tensor([[ 0,  1,  2,  3,  4],
-                    [-1,  0,  1,  2,  3],
-                    [-2, -1,  0,  1,  2],
-                    [-3, -2, -1,  0,  1],
-                    [-4, -3, -2, -1,  0]])
-
-        >>> torch.abs(x1-x2)
-            tensor([[0, 1, 2, 3, 4],
-                    [1, 0, 1, 2, 3],
-                    [2, 1, 0, 1, 2],
-                    [3, 2, 1, 0, 1],
-                    [4, 3, 2, 1, 0]])
-        """     
-        device = distcum_scores.get_device()
         position_effect = torch.abs(x1 - x2)[None, None, :, :].type(
             torch.FloatTensor
         )  # [1, 1, seqlen, seqlen]
         position_effect = position_effect.to(device)
         # [batch_size, 8, seqlen, seqlen] positive distance
-        # dist_score => d(t, tau)
-        dist_scores = torch.clamp(
-            (disttotal_scores - distcum_scores) * position_effect, min=0.0
-        )
-        dist_scores = dist_scores.sqrt().detach()
 
-        m = nn.Softplus()
-        # 1,8,1,1  gamma is \theta in the paper (learnable decay rate parameter)
-        gamma = -1.0 * m(gamma).unsqueeze(0)
-        # Now after do exp(gamma*distance) and then clamp to 1e-5 to 1e-5
-        total_effect = torch.clamp(
-            torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
+        tdtotal_score = torch.sum(td_scores_, dim=-1, keepdim=True)
+        tdcumsum_score = torch.cumsum(td_scores_, dim=-1)
+
+        td_scores = torch.clamp(
+            (tdtotal_score - tdcumsum_score) * position_effect, min=0.0
         )
-        # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-        return total_effect
+        td_scores = td_scores.sqrt().detach()
+
+        return td_scores
 
     @torch.no_grad()
     def get_extended_attention_mask(self, mask):
