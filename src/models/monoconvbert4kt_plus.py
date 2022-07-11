@@ -154,13 +154,20 @@ class MonotonicConvBertSelfAttention(nn.Module):
         #############
         # dist func #
         #############
-        total_effect = self.dist_func(attention_scores, mask, self.gammas)
+        dist_scores = self.dist_func(attention_scores, mask)
+        # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+
+        m = nn.Softplus()
+        # 1,8,1,1  gamma is \theta in the paper (learnable decay rate parameter)
+        gamma = -1.0 * m(self.gammas).unsqueeze(0)
+        # Now after do exp(gamma*distance) and then clamp to 1e-5 to 1e-5
+        total_effect = torch.clamp(
+            torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
+        )
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         attention_scores = attention_scores * total_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-
-        #print('a', attention_scores)
 
         # |mask| = (bs, n)
         attention_mask = self.get_extended_attention_mask(mask)
@@ -206,7 +213,7 @@ class MonotonicConvBertSelfAttention(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def dist_func(self, attention_scores, mask, gamma):
+    def dist_func(self, attention_scores, mask):
 
         scores = attention_scores
         bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
@@ -254,16 +261,7 @@ class MonotonicConvBertSelfAttention(nn.Module):
 
         dist_scores = dist_scores.sqrt().detach()
 
-        m = nn.Softplus()
-        # 1,8,1,1  gamma is \theta in the paper (learnable decay rate parameter)
-        gamma = -1.0 * m(gamma).unsqueeze(0)
-        # Now after do exp(gamma*distance) and then clamp to 1e-5 to 1e-5
-        total_effect = torch.clamp(
-            torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
-        )
-        # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-
-        return total_effect
+        return dist_scores #total_effect
 
     @torch.no_grad()
     def get_extended_attention_mask(self, mask):
