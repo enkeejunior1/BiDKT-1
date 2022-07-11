@@ -155,7 +155,7 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         #############
         # dist func #
         #############
-        total_effect = self.dist_func(td, mask, self.gammas)
+        total_effect = self.dist_func(attention_scores, td, mask, self.gammas)
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
         attention_scores = attention_scores * total_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
@@ -203,45 +203,23 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def dist_func(self, td, mask, gamma):
-
-        td = F.normalize(td, dim=-1)
-
-        scores = self.get_extended_attention_td(td)
-        #|scores| = (bs, n_attn_head, n, n)
-
-        bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
-
-        x1 = torch.arange(seqlen).expand(seqlen, -1)
-        x2 = x1.transpose(0, 1).contiguous()
+    def dist_func(self, attention_scores, td, mask, gamma):
 
         attention_mask = self.get_extended_attention_mask(mask)
 
-        scores_ = scores.masked_fill_(attention_mask == 0, -1e4)
+        # nomal monotonic
+        scores = attention_scores
+        bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
+        x1 = torch.arange(seqlen).expand(seqlen, -1)
+        x2 = x1.transpose(0, 1).contiguous()
 
-        scores_ = F.softmax(scores_, dim=-1)
-
+        scores_ = scores.masked_fill_(attention_mask == 0, -1e8)
+        scores_ = F.softmax(scores_, dim=-1)  # (batch_size, 8, sq, sq)
+        scores_ = scores_ * attention_mask.float()
         # [batch_size, 8, seqlen, seqlen]
         distcum_scores = torch.cumsum(scores_, dim=-1)
-
         # [batch_size, 8, seqlen, 1]
         disttotal_scores = torch.sum(scores_, dim=-1, keepdim=True)
-
-        """
-        >>> x1-x2
-            tensor([[ 0,  1,  2,  3,  4],
-                    [-1,  0,  1,  2,  3],
-                    [-2, -1,  0,  1,  2],
-                    [-3, -2, -1,  0,  1],
-                    [-4, -3, -2, -1,  0]])
-
-        >>> torch.abs(x1-x2)
-            tensor([[0, 1, 2, 3, 4],
-                    [1, 0, 1, 2, 3],
-                    [2, 1, 0, 1, 2],
-                    [3, 2, 1, 0, 1],
-                    [4, 3, 2, 1, 0]])
-        """     
         device = distcum_scores.get_device()
         position_effect = torch.abs(x1 - x2)[None, None, :, :].type(
             torch.FloatTensor
@@ -249,11 +227,11 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         position_effect = position_effect.to(device)
         # [batch_size, 8, seqlen, seqlen] positive distance
         # dist_score => d(t, tau)
+
         dist_scores = torch.clamp(
             (disttotal_scores - distcum_scores) * position_effect, min=0.0
         )
         dist_scores = dist_scores.sqrt().detach()
-
         m = nn.Softplus()
         # 1,8,1,1  gamma is \theta in the paper (learnable decay rate parameter)
         gamma = -1.0 * m(gamma).unsqueeze(0)
@@ -262,6 +240,30 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
             torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
         )
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+
+        # td_effect
+        td = F.normalize(td, dim=-1)
+        td_scores = self.get_extended_attention_td(td)
+        #|scores| = (bs, n_attn_head, n, n)
+        bs, head, seqlen = td_scores.size(0), td_scores.size(1), td_scores.size(2)
+        td_scores_ = td_scores.masked_fill_(attention_mask == 0, -1e4)
+        td_scores_ = F.softmax(td_scores_, dim=-1)
+        #|scores_| = (bs, n_attn_head, n, n)
+
+        td_device = td_scores_.get_device()
+        
+        upper_tri_mat = np.ones(shape=(bs, head, seqlen, seqlen))
+        upper_tri_mat = np.triu(upper_tri_mat)
+        scores_masking = torch.FloatTensor((upper_tri_mat == 0)).to(td_device)
+        upper_tri_mat = torch.FloatTensor(upper_tri_mat).to(td_device)
+
+        td_scores_ = torch.clamp(
+            torch.clamp((td_scores_ * gamma).exp(), min=1e-5), max=1e5
+        )        
+        td_effect = (td_scores_ * scores_masking) + upper_tri_mat
+
+        # total_effect - td_effect
+        total_effect = total_effect - td_effect
 
         return total_effect
 

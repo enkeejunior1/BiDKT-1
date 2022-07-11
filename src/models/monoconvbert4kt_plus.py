@@ -247,9 +247,11 @@ class MonotonicConvBertSelfAttention(nn.Module):
         position_effect = position_effect.to(device)
         # [batch_size, 8, seqlen, seqlen] positive distance
         # dist_score => d(t, tau)
+
         dist_scores = torch.clamp(
             (disttotal_scores - distcum_scores) * position_effect, min=0.0
         )
+
         dist_scores = dist_scores.sqrt().detach()
 
         m = nn.Softplus()
