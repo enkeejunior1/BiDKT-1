@@ -153,9 +153,9 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         #############
-        # dist func #
+        # forgetting_func #
         #############
-        total_effect = self.dist_func(attention_scores, td, mask, self.gammas)
+        total_effect = self.forgetting_func(attention_scores, td, mask, self.gammas)
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
         attention_scores = attention_scores * total_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
@@ -203,11 +203,13 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def dist_func(self, attention_scores, td, mask, gamma):
+    def forgetting_func(self, attention_scores, td, mask, gamma):
 
         attention_mask = self.get_extended_attention_mask(mask)
 
-        # nomal monotonic
+        #######
+        # nomal dist_func
+        #######
         scores = attention_scores
         bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
         x1 = torch.arange(seqlen).expand(seqlen, -1)
@@ -241,7 +243,11 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         )
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
-        # td_effect
+        #print("total_effect", total_effect[0][0][1])
+
+        #######
+        # forgetting_effect
+        #######
         td = F.normalize(td, dim=-1)
         td_scores = self.get_extended_attention_td(td)
         #|scores| = (bs, n_attn_head, n, n)
@@ -251,19 +257,37 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         #|scores_| = (bs, n_attn_head, n, n)
 
         td_device = td_scores_.get_device()
+
+        tdtotal_score = torch.sum(td_scores_, dim=-1, keepdim=True)
+        tdcumsum_score = torch.cumsum(td_scores_, dim=-1)
+
+        td_scores = torch.clamp(
+            (tdtotal_score - tdcumsum_score) * position_effect, min=0.0
+        )
+        td_scores = td_scores.sqrt().detach()
+
+        td_effect = torch.clamp(
+            torch.clamp((td_scores * gamma).exp(), min=1e-5), max=1e5
+        )
+
+        #print("td_effect", td_effect[0][0][1])
         
-        upper_tri_mat = np.ones(shape=(bs, head, seqlen, seqlen))
-        upper_tri_mat = np.triu(upper_tri_mat)
-        scores_masking = torch.FloatTensor((upper_tri_mat == 0)).to(td_device)
-        upper_tri_mat = torch.FloatTensor(upper_tri_mat).to(td_device)
-    
-        td_effect = (-1.0 * td_scores_) * scores_masking # + upper_tri_mat
-        # 윗 삼각행렬이 0인 상태로 더해줘야 함
+        # upper_tri_mat = np.ones(shape=(bs, head, seqlen, seqlen))
+        # upper_tri_mat = np.triu(upper_tri_mat)
+        # scores_masking = torch.FloatTensor((upper_tri_mat == 0)).to(td_device)
+        # upper_tri_mat = torch.FloatTensor(upper_tri_mat).to(td_device)
 
-        # total_effect + td_effect(이미 -값이므로)
-        total_effect = total_effect + td_effect
+        # # gamma는 - 값
+        # td_effect = (td_scores_) * gamma * scores_masking
+        # # 윗 삼각행렬이 0인 상태로 더해줘야 함
 
-        return total_effect
+        # ######
+        # # dist + forgetting
+        # ######
+        # # total_effect + td_effect(이미 -값이므로)
+        # total_effect = total_effect + td_effect
+
+        return td_effect #total_effect
 
     @torch.no_grad()
     def get_extended_attention_mask(self, mask):
