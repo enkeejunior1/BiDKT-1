@@ -74,6 +74,7 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         )
         
         self.gammas = nn.Parameter(torch.zeros(self.num_attention_heads, 1, 1))
+        self.epsilon = nn.Parameter(torch.zeros(self.num_attention_heads, 1, 1))
 
         self.dropout = nn.Dropout(dropout_p)
 
@@ -157,15 +158,27 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         #############
 
         m = nn.Softplus()
-        # 1,8,1,1  gamma is \theta in the paper (learnable decay rate parameter)
+        
+        # dist effect
         gamma = -1.0 * m(self.gammas).unsqueeze(0)
-        td_scores = self.forgetting_func(td, mask)
+        dist_score = self.dist_func(attention_scores, mask)
         # |total_effect| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-        td_effect = torch.clamp(
-            torch.clamp((td_scores * gamma).exp(), min=1e-5), max=1e5
+        total_effect = torch.clamp(
+            torch.clamp((dist_score * gamma).exp(), min=1e-5), max=1e5
         )
 
-        attention_scores = attention_scores * td_effect
+        # td effect
+        epsilon = -1.0 * m(self.epsilon).unsqueeze(0)
+        td_scores = self.forgetting_func(td, mask)
+        td_effect = td_scores * epsilon
+        # td_effect = torch.clamp(
+        #     torch.clamp((td_scores * epsilon).exp(), min=1e-5), max=1e5
+        # )
+
+        # dist effect + td effect
+        total_effect = total_effect + td_effect
+
+        attention_scores = attention_scores * total_effect
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         # |mask| = (bs, n)
@@ -211,36 +224,67 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def forgetting_func(self, td, mask):
+    def dist_func(self, attention_scores, mask):
 
-        attention_mask = self.get_extended_attention_mask(mask)
-       
-        td = F.normalize(td, dim=-1)
-        td_scores = self.get_extended_attention_td(td)
-        #|scores| = (bs, n_attn_head, n, n)
-        bs, head, seqlen = td_scores.size(0), td_scores.size(1), td_scores.size(2)
-        td_scores_ = td_scores.masked_fill_(attention_mask == 0, -1e4)
-        td_scores_ = F.softmax(td_scores_, dim=-1)
-        #|scores_| = (bs, n_attn_head, n, n)
-
-        device = td_scores_.get_device()
+        scores = attention_scores
+        bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
 
         x1 = torch.arange(seqlen).expand(seqlen, -1)
         x2 = x1.transpose(0, 1).contiguous()
 
+        attention_mask = self.get_extended_attention_mask(mask)
+
+        scores_ = scores.masked_fill_(attention_mask == 0, -1e32)
+
+        scores_ = F.softmax(scores_, dim=-1)  # (batch_size, 8, sq, sq)
+        scores_ = scores_ * attention_mask.float()
+
+        # [batch_size, 8, seqlen, seqlen]
+        distcum_scores = torch.cumsum(scores_, dim=-1)
+        # [batch_size, 8, seqlen, 1]
+        disttotal_scores = torch.sum(scores_, dim=-1, keepdim=True)
+
+        device = distcum_scores.get_device()
         position_effect = torch.abs(x1 - x2)[None, None, :, :].type(
             torch.FloatTensor
         )  # [1, 1, seqlen, seqlen]
         position_effect = position_effect.to(device)
         # [batch_size, 8, seqlen, seqlen] positive distance
+        # dist_score => d(t, tau)
 
-        tdtotal_score = torch.sum(td_scores_, dim=-1, keepdim=True)
-        tdcumsum_score = torch.cumsum(td_scores_, dim=-1)
-
-        td_scores = torch.clamp(
-            (tdtotal_score - tdcumsum_score) * position_effect, min=0.0
+        dist_scores = torch.clamp(
+            (disttotal_scores - distcum_scores) * position_effect, min=0.0
         )
-        td_scores = td_scores.sqrt().detach()
+
+        dist_scores = dist_scores.sqrt().detach()
+
+        return dist_scores #total_effect
+
+    @torch.no_grad()
+    def forgetting_func(self, td, mask):
+
+        attention_mask = self.get_extended_attention_mask(mask)
+
+        td = F.normalize(td, dim=-1)
+        td_scores = self.get_extended_attention_td(td)
+        #|scores| = (bs, n_attn_head, n, n)
+        bs, head, seqlen = td_scores.size(0), td_scores.size(1), td_scores.size(2)
+        td_scores_ = td_scores.masked_fill_(attention_mask == 0, -1e4)
+
+        device = td_scores_.get_device()
+        
+        #ones
+        one_vectors = np.ones(shape=(bs, head, seqlen, seqlen))
+
+        #상 삼각을 만듬
+        upper_triu = np.triu(one_vectors)
+        upper_triu_bool = upper_triu == 0
+        #bool로 하 삼각 만들기 ==0
+        lower_triu = upper_triu_bool.astype(float)
+        lower_triu = torch.Tensor(lower_triu).to(device)
+        #곱하기
+
+        td_scores = td_scores_ * lower_triu
 
         return td_scores
 
