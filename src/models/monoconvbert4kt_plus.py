@@ -223,11 +223,7 @@ class MonotonicConvBertSelfAttention(nn.Module):
 
         attention_mask = self.get_extended_attention_mask(mask)
 
-<<<<<<< HEAD
-        scores_ = scores.masked_fill_(attention_mask == 0, -1e8)
-=======
         scores_ = scores.masked_fill_(attention_mask == 0, -1e32)
->>>>>>> d5238210df470228e881c5b7f4826730e8984278
 
         scores_ = F.softmax(scores_, dim=-1)  # (batch_size, 8, sq, sq)
         scores_ = scores_ * attention_mask.float()
