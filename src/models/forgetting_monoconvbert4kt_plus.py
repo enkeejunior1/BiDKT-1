@@ -268,23 +268,44 @@ class ForgettingMonotonicConvBertSelfAttention(nn.Module):
         td = F.normalize(td, dim=-1)
         td_scores = self.get_extended_attention_td(td)
         #|scores| = (bs, n_attn_head, n, n)
+
+        # For scoring
+        td_scores_ = F.softmax(td_scores, dim = -1)
+
         bs, head, seqlen = td_scores.size(0), td_scores.size(1), td_scores.size(2)
         td_scores_ = td_scores.masked_fill_(attention_mask == 0, -1e4)
 
         device = td_scores_.get_device()
-        
-        #ones
-        one_vectors = np.ones(shape=(bs, head, seqlen, seqlen))
 
-        #상 삼각을 만듬
+        # decay
+        tdcum_scores = torch.cumsum(td_scores_, dim=-1)
+        tdtotal_scores = torch.sum(td_scores_, dim=-1, keepdim=True)
+
+        x1 = torch.arange(seqlen).expand(seqlen, -1)
+        x2 = x1.transpose(0, 1).contiguous()
+
+        position_effect = torch.abs(x1 - x2)[None, None, :, :].type(
+            torch.FloatTensor
+        )  # [1, 1, seqlen, seqlen]
+        position_effect = position_effect.to(device)
+
+        dist_scores = torch.clamp(
+            (tdtotal_scores - tdcum_scores) * position_effect, min=0.0
+        )
+
+        td_scores = dist_scores.sqrt().detach()
+        
+        # Make lower_triu for masking
+        one_vectors = np.ones(shape=(bs, head, seqlen, seqlen))
+        # upper_triu
         upper_triu = np.triu(one_vectors)
+        # reverse
         upper_triu_bool = upper_triu == 0
-        #bool로 하 삼각 만들기 ==0
+        # lower_triu
         lower_triu = upper_triu_bool.astype(float)
         lower_triu = torch.Tensor(lower_triu).to(device)
-        #곱하기
 
-        td_scores = td_scores_ * lower_triu
+        td_scores = td_scores * lower_triu
 
         return td_scores
 
