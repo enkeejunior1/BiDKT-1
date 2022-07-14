@@ -1,6 +1,6 @@
 #!/bin/bash
 
-model_names="monoconvbert4kt_plus convbert4kt_plus"
+model_names="monaconvbert4kt_plus convbert4kt_plus"
 dataset_names="assist2009_pid assist2012_pid assist2017_pid algebra2005_pid algebra2006_pid"
 
 # LeakyReLU 측정

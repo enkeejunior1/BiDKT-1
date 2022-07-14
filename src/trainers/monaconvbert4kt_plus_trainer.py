@@ -9,58 +9,58 @@ from random import random, randint
 
 from utils import EarlyStopping
 
-# 15% <MASK>
+# For Train MLM
+# 15% <MASK>, 80% of 15% are real <MASK>, 10% of 15% are reverse, 10% of 15% are not changed
 def Mlm4BertTrain(r_seqs, mask_seqs):
     #|r_seqs| = (bs, n)
 
-    # r_seqs를 불러들인 후, for문으로 반복해서 불러들임
     mlm_r_seqs = []
     mlm_idxs = []
 
-    # 불러들인 r_seq를 대상으로 torch.masked_select()를 사용해서 길이를 자름
-    # PAD는 -1로 처리
+    # <PAD> is -1
     for r_seq, mask_seq in zip(r_seqs, mask_seqs):
         r_len = r_seq.size(0)
-        # real_r_seq: r_seq에 <PAD>를 제거한 sq
+        # real_r_seq: r_seq with no <PAD>
         real_r_seq = torch.masked_select(r_seq, mask_seq).cpu()
         real_r_seq_len = real_r_seq.size(0)
 
         mlm_idx = np.random.choice(real_r_seq_len, int(real_r_seq_len*0.15), replace=False)
 
         for idx in mlm_idx:
-            if random() < 0.8: # 15% 중 80%는 <MASK>
-                real_r_seq[idx] = 2 # <MASK>는 2로 표시하기
-            elif random() < 0.5: # 15% 중 10%는 0과 1의 random 값으로 넣기
+            if random() < 0.8: # 15% of 80% are <MASK>
+                real_r_seq[idx] = 2 # <MASK> is 2
+            elif random() < 0.5: # 15% of 10% are random among the 0 or 1
                 real_r_seq[idx] = randint(0, 1)
-            # 15% 중 10%는 원래 값 그대로
+            # 15% of 10% are same with original
 
-        # pad_r_seq에 PAD(-1)을 씌움
+        # cover the PAD(-1)
         pad_len = r_len - real_r_seq_len
-        # <PAD>를 3으로 채우기, -1로 채우면 embedding에서 error 발생
+        # <PAD> is 3
         pad_seq = torch.full((1, pad_len), 3).squeeze(0) 
-        # 패드 다시 결합
+        # combine the <PAD>
         pad_r_seq = torch.cat((real_r_seq, pad_seq), dim=-1)
-        # mlm_r_seqs에 넣기
+        # append to the mlm_r_seqs
         mlm_r_seqs.append(pad_r_seq)
 
-        # <mask> idx bool 만들기
-        # r_len의 길이(전체 길이)만큼 zero vector로 만듦
+        # <MASK> idx bool
+        # make zero vector with r_len size
         mlm_zeros = np.zeros(shape=(r_len, ))
-        # mlm_idx에 해당하는 곳에 1을 넣음
+        # mlm_idx are 1
         mlm_zeros[mlm_idx] = 1
-        # mlm_idxs에 값을 더함
+        # append to the mlm_idxs
         mlm_idxs.append(mlm_zeros)
 
     mlm_r_seqs = torch.stack(mlm_r_seqs)
     mlm_idxs = torch.BoolTensor(mlm_idxs)
 
-    # mlm_r_seqs: mask가 씌워진 r_seqs
-    # mlm_idx: mask가 씌워진 idx 값
+    # mlm_r_seqs: masked r_seqs
+    # mlm_idx: masked idx
     return mlm_r_seqs, mlm_idxs
     # |mlm_r_seqs| = (bs, n)
     # |mask_seqs| = (bs, n)
 
-# seq의 가장 마지막에 <MASK>
+# For Test MLM
+# The last of seq will be changed to the <MASK>
 def Mlm4BertTest(r_seqs, mask_seqs):
     #|r_seqs| = (bs, n)
 
@@ -73,13 +73,13 @@ def Mlm4BertTest(r_seqs, mask_seqs):
         real_r_seq = torch.masked_select(r_seq, mask_seq).cpu()
         real_r_seq_len = real_r_seq.size(0)
 
-        #여기서는 real_r_seq의 마지막
+        # last index of real_r_seq
         mlm_idx = real_r_seq_len - 1
-        #마지막 index에 <MASK>를 씌움, <MASK>는 2
+        # last index get a <MASK>, <MASK> is 2
         real_r_seq[mlm_idx] = 2
 
         pad_len = r_len - real_r_seq_len
-        pad_seq = torch.full((1, pad_len), 3).squeeze(0) # <PAD>는 3
+        pad_seq = torch.full((1, pad_len), 3).squeeze(0) # <PAD> is 3
         pad_r_seq = torch.cat((real_r_seq, pad_seq), dim=-1)
         mlm_r_seqs.append(pad_r_seq)
 
@@ -106,7 +106,7 @@ class MonaConvBert4ktPlusTrainer():
         crit, 
         max_seq_len, 
         grad_acc=False, 
-        grad_acc_iter=4 #4면 기존 batch_size의 4배
+        grad_acc_iter=4
         ):
         self.model = model
         self.optimizer = optimizer
@@ -128,50 +128,49 @@ class MonaConvBert4ktPlusTrainer():
             self.model.train()
             q_seqs, r_seqs, pid_seqs, mask_seqs = data
 
-            q_seqs = q_seqs.to(self.device) #|q_seqs| = (bs, n)
-            r_seqs = r_seqs.to(self.device) #|r_seqs| = (bs, n)
-            pid_seqs = pid_seqs.to(self.device)
-            mask_seqs = mask_seqs.to(self.device) #|mask_seqs| = (bs, n)
+            q_seqs = q_seqs.to(self.device) # |q_seqs| = (bs, n)
+            r_seqs = r_seqs.to(self.device) # |r_seqs| = (bs, n)
+            pid_seqs = pid_seqs.to(self.device) # |pid_seqs| = (bs, n)
+            mask_seqs = mask_seqs.to(self.device) # |mask_seqs| = (bs, n)
 
-            # correct에서 따로 사용하기 위해 clone 작성
+            # for correct
             real_seqs = r_seqs.clone()
 
-            # mlm_r_seqs: r_seqs에 Masked Language Model 구현을 위한 [MASK]를 씌움, [MASK]는 2로 표기 / mlm_idx: [MASK]의 위치
+            # mlm_r_seqs: for MLM, [MASK] position get 2 / mlm_idx are index of [MASK]
             mlm_r_seqs, mlm_idxs = Mlm4BertTrain(r_seqs, mask_seqs)
             # |mlm_r_seqs| = (bs, n)
-            # |mlm_idxs| = (bs, n), True or False가 들어있어야 함
-
+            # |mlm_idxs| = (bs, n)
             mlm_r_seqs = mlm_r_seqs.to(self.device)
             mlm_idxs = mlm_idxs.to(self.device)
 
-            # zero_grad(아래로 위치 변경)
-        
             y_hat = self.model(
                 q_seqs.long(), 
-                mlm_r_seqs.long(), # train을 위한 mlm된 r_seqs
+                mlm_r_seqs.long(), # r_seqs with MLM
                 pid_seqs.long(),
-                mask_seqs.long() # attn_mask
+                mask_seqs.long() # for attn_mask
             ).to(self.device)
             # |y_hat| = (bs, n, output_size=1)
 
             y_hat = y_hat.squeeze()
              # |y_hat| = (bs, n)
 
-            # 예측값과 실제값
+            # predictions
             y_hat = torch.masked_select(y_hat, mlm_idxs)
             #|y_hat| = (bs * n - n_mlm_idxs)
+            # real values
             correct = torch.masked_select(real_seqs, mlm_idxs)
             #|correct| = (bs * n - n_mlm_idxs)
 
             loss = self.crit(y_hat, correct)
             # |loss| = (1)
 
-            #grad_accumulation
+            # grad_accumulation = True
             if self.grad_acc == True:
                 loss.backward()
                 if (idx + 1) % self.grad_acc_iter == 0:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
+            # grad_accumulation = False
             else:
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -202,8 +201,7 @@ class MonaConvBert4ktPlusTrainer():
         with torch.no_grad():
             for data in tqdm(valid_loader):
                 self.model.eval()
-                q_seqs, r_seqs, pid_seqs, mask_seqs = data #collate에 정의된 데이터가 나옴
-                #|r_seqs| = (bs, sq)
+                q_seqs, r_seqs, pid_seqs, mask_seqs = data
                 
                 q_seqs = q_seqs.to(self.device)
                 r_seqs = r_seqs.to(self.device)
@@ -216,8 +214,6 @@ class MonaConvBert4ktPlusTrainer():
 
                 mlm_r_seqs = mlm_r_seqs.to(self.device)
                 mlm_idxs = mlm_idxs.to(self.device)
-                # |mlm_r_seqs| = (bs, n)
-                # |mlm_idxs| = (bs, n), True or False가 들어있어야 함
 
                 y_hat = self.model(
                     q_seqs.long(),
@@ -232,7 +228,6 @@ class MonaConvBert4ktPlusTrainer():
                 correct = torch.masked_select(real_seqs, mlm_idxs)
 
                 loss = self.crit(y_hat, correct)
-                # |loss| = (1)
 
                 y_trues.append(correct)
                 y_scores.append(y_hat)
@@ -259,8 +254,7 @@ class MonaConvBert4ktPlusTrainer():
         with torch.no_grad():
             for data in tqdm(test_loader):
                 self.model.eval()
-                q_seqs, r_seqs, pid_seqs, mask_seqs = data #collate에 정의된 데이터가 나옴
-                #|r_seqs| = (bs, sq)
+                q_seqs, r_seqs, pid_seqs, mask_seqs = data
                 
                 q_seqs = q_seqs.to(self.device)
                 r_seqs = r_seqs.to(self.device)
@@ -273,8 +267,6 @@ class MonaConvBert4ktPlusTrainer():
 
                 mlm_r_seqs = mlm_r_seqs.to(self.device)
                 mlm_idxs = mlm_idxs.to(self.device)
-                # |mlm_r_seqs| = (bs, n)
-                # |mlm_idxs| = (bs, n), True or False가 들어있어야 함
 
                 y_hat = self.model(
                     q_seqs.long(),
@@ -289,7 +281,6 @@ class MonaConvBert4ktPlusTrainer():
                 correct = torch.masked_select(real_seqs, mlm_idxs)
 
                 loss = self.crit(y_hat, correct)
-                # |loss| = (1)
 
                 y_trues.append(correct)
                 y_scores.append(y_hat)
@@ -307,7 +298,7 @@ class MonaConvBert4ktPlusTrainer():
         elif metric_name == "RMSE":
             return loss_result
 
-    #auc용으로 train
+    # train use the _train, _validate, _test
     def train(self, train_loader, valid_loader, test_loader, config):
         
         if config.crit == "binary_cross_entropy":
@@ -319,13 +310,11 @@ class MonaConvBert4ktPlusTrainer():
             best_test_score = float('inf')
             metric_name = "RMSE"
         
-        #출력을 위한 기록용
         train_scores = []
         valid_scores = []
         test_scores = []
-        #best_model = None
 
-        # early_stopping 선언
+        # early_stopping
         early_stopping = EarlyStopping(metric_name=metric_name,
                                     best_score=best_valid_score)
 
@@ -358,11 +347,9 @@ class MonaConvBert4ktPlusTrainer():
             if config.crit == "binary_cross_entropy":
                 if test_score >= best_test_score:
                     best_test_score = test_score
-                    #best_model = deepcopy(self.model.state_dict())
             elif config.crit == "rmse":
                 if test_score <= best_test_score:
                     best_test_score = test_score
-                    #best_model = deepcopy(self.model.state_dict())
 
             print("Epoch(%d/%d) result: train_score=%.4f  valid_score=%.4f test_score=%.4f best_test_score=%.4f" % (
                 epoch_index + 1,
@@ -379,8 +366,6 @@ class MonaConvBert4ktPlusTrainer():
             ))
         print("\n")
         
-        # 가장 최고의 모델 복구
-        #self.model.load_state_dict(best_model)
         self.model.load_state_dict(torch.load("../checkpoints/checkpoint.pt"))
 
         return train_scores, valid_scores, \
