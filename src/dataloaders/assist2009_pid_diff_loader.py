@@ -49,12 +49,15 @@ class ASSIST2009_PID_DIFF(Dataset):
         pid2idx = {pid: idx for idx, pid in enumerate(pid_list)} 
 
         # difficult
-        diff = df.groupby('item_id')['correct'].mean()
+        diff = np.round(df.groupby('item_id')['correct'].mean() * 100)
         diff_list = np.unique(df.groupby('item_id')['correct'].mean())
+<<<<<<< HEAD
         diff2idx = {d: idx for idx, d in enumerate(diff_list)}
 
         #diff.values
         #diff.index
+=======
+>>>>>>> 0d568a33bd871738e45a54eb3efe0e3bbdf7e0b0
 
         q_seqs = [] #로그 기준으로 각 user별 질문 목록을 담은 리스트
         r_seqs = [] #로그 기준으로 각 user별 정답 목록을 담은 리스트
@@ -73,6 +76,7 @@ class ASSIST2009_PID_DIFF(Dataset):
             r_seqs.append(r_seq)
             pid_seqs.append(pid_seq)
             diff_seqs.append(diff_seq)
+
 
         return q_seqs, r_seqs, q_list, u_list, r_list, q2idx, u2idx, pid_seqs, diff_seqs, pid_list, diff_list #끝에 두개 추가
 
