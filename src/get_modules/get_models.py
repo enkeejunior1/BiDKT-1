@@ -170,6 +170,7 @@ def get_models(num_q, num_r, num_pid, device, config):
             use_leakyrelu=config.use_leakyrelu,
             dropout_p=config.dropout_p
         ).to(device)
+    # this model is main model of ours
     elif config.model_name == "monaconvbert4kt_plus":
         model = MonaConvBert4ktPlus(
             num_q=num_q,
