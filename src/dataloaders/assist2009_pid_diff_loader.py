@@ -50,8 +50,11 @@ class ASSIST2009_PID_DIFF(Dataset):
 
         # difficult
         diff = np.round(df.groupby('item_id')['correct'].mean() * 100)
-        diff_list = np.unique(diff)
-        # diff2idx = {d: idx for idx, d in enumerate(diff_list)}
+        diff_list = np.unique(df.groupby('item_id')['correct'].mean())
+        diff2idx = {d: idx for idx, d in enumerate(diff_list)}
+
+        #diff.values
+        #diff.index
 
         q_seqs = [] #로그 기준으로 각 user별 질문 목록을 담은 리스트
         r_seqs = [] #로그 기준으로 각 user별 정답 목록을 담은 리스트
