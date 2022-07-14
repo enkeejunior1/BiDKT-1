@@ -9,11 +9,13 @@ from models.ma_bert4kt_dualenc_kr import MaBert4ktDualencKr
 from models.bigbird4kt_plus import Bigbird4ktPlus
 from models.bert4kt_plus_time import Bert4ktPlusTime
 from models.convbert4kt_plus import ConvBert4ktPlus
-from models.monoconvbert4kt_plus import MonoConvBert4ktPlus
+from models.monaconvbert4kt_plus import MonaConvBert4ktPlus
 from models.forgetting_monoconvbert4kt_plus import ForgettingMonoConvBert4ktPlus
 
+# get models
 def get_models(num_q, num_r, num_pid, device, config):
 
+    # choose the models
     if config.model_name == "bidkt":
         model = Bidkt(
             num_q=num_q,
@@ -168,8 +170,8 @@ def get_models(num_q, num_r, num_pid, device, config):
             use_leakyrelu=config.use_leakyrelu,
             dropout_p=config.dropout_p
         ).to(device)
-    elif config.model_name == "monoconvbert4kt_plus":
-        model = MonoConvBert4ktPlus(
+    elif config.model_name == "monaconvbert4kt_plus":
+        model = MonaConvBert4ktPlus(
             num_q=num_q,
             num_r=num_r,
             num_pid=num_pid,

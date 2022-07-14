@@ -369,7 +369,7 @@ class MySequential(nn.Sequential):
         return x
 
 
-class MonoConvBert4ktPlus(nn.Module):
+class MonaConvBert4ktPlus(nn.Module):
 
     def __init__(
         self,
