@@ -11,9 +11,11 @@ from models.bert4kt_plus_time import Bert4ktPlusTime
 from models.convbert4kt_plus import ConvBert4ktPlus
 from models.monaconvbert4kt_plus import MonaConvBert4ktPlus
 from models.forgetting_monoconvbert4kt_plus import ForgettingMonoConvBert4ktPlus
+from models.monaconvbert4kt_plus_pt import MonaConvBert4ktPlusPastTrial
+from models.monaconvbert4kt_plus_diff import MonaConvBert4ktPlusDiff
 
 # get models
-def get_models(num_q, num_r, num_pid, device, config):
+def get_models(num_q, num_r, num_pid, num_diff, device, config):
 
     # choose the models
     if config.model_name == "bidkt":
@@ -190,6 +192,35 @@ def get_models(num_q, num_r, num_pid, device, config):
             num_q=num_q,
             num_r=num_r,
             num_pid=num_pid,
+            hidden_size=config.hidden_size,
+            output_size=config.output_size,
+            num_head=config.num_head,
+            num_encoder=config.num_encoder,
+            max_seq_len=config.max_seq_len,
+            device=device,
+            use_leakyrelu=config.use_leakyrelu,
+            dropout_p=config.dropout_p
+        ).to(device)
+    elif config.model_name == "monaconvbert4kt_plus_pt":
+        model = MonaConvBert4ktPlusPastTrial(
+            num_q=num_q,
+            num_r=num_r,
+            num_pid=num_pid,
+            hidden_size=config.hidden_size,
+            output_size=config.output_size,
+            num_head=config.num_head,
+            num_encoder=config.num_encoder,
+            max_seq_len=config.max_seq_len,
+            device=device,
+            use_leakyrelu=config.use_leakyrelu,
+            dropout_p=config.dropout_p
+        ).to(device)
+    elif config.model_name == "monaconvbert4kt_plus_diff":
+        model = MonaConvBert4ktPlusDiff(
+            num_q=num_q,
+            num_r=num_r,
+            num_pid=num_pid,
+            num_diff=num_diff,
             hidden_size=config.hidden_size,
             output_size=config.output_size,
             num_head=config.num_head,

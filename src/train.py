@@ -9,7 +9,7 @@ from utils import get_optimizers, get_crits, recorder, visualizer
 
 from define_argparser import define_argparser
 
-def main(config, train_loader=None, valid_loader=None, test_loader=None, num_q=None, num_r=None, num_pid=None):
+def main(config, train_loader=None, valid_loader=None, test_loader=None, num_q=None, num_r=None, num_pid=None, num_diff=None):
     # 0. device setting
     device = torch.device('cpu') if config.gpu_id < 0 else torch.device('cuda:%d' % config.gpu_id)
     
@@ -22,12 +22,13 @@ def main(config, train_loader=None, valid_loader=None, test_loader=None, num_q=N
         num_q = num_q
         num_r = num_r
         num_pid = num_pid
+        num_diff = num_diff
     # 1-2. not use fivefold
     else:
-        train_loader, valid_loader, test_loader, num_q, num_r, num_pid = get_loaders(config)
+        train_loader, valid_loader, test_loader, num_q, num_r, num_pid, num_diff = get_loaders(config)
 
     # 2. select models using get_models
-    model = get_models(num_q, num_r, num_pid, device, config)
+    model = get_models(num_q, num_r, num_pid, num_diff, device, config)
     
     # 3. select optimizers using get_optimizers
     optimizer = get_optimizers(model, config)

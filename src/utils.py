@@ -106,6 +106,42 @@ def pid_time_collate_fn(batch, pad_val=-1):
     #|r_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
     #|mask_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
 
+def pid_diff_collate_fn(batch, pad_val=-1):
+
+    q_seqs = []
+    r_seqs = []
+    pid_seqs = []
+    diff_seqs = []
+
+    for q_seq, r_seq, pid_seq, diff_seq in batch:
+
+        q_seqs.append(torch.Tensor(q_seq))
+        r_seqs.append(torch.Tensor(r_seq))
+        pid_seqs.append(torch.Tensor(pid_seq))
+        diff_seqs.append(torch.Tensor(diff_seq))
+
+    q_seqs = pad_sequence(
+        q_seqs, batch_first=True, padding_value=pad_val
+    )
+    r_seqs = pad_sequence(
+        r_seqs, batch_first=True, padding_value=pad_val
+    )
+    pid_seqs = pad_sequence(
+        pid_seqs, batch_first=True, padding_value=pad_val
+    )
+    diff_seqs = pad_sequence(
+        diff_seqs, batch_first=True, padding_value=pad_val
+    )
+
+    mask_seqs = (q_seqs != pad_val)
+
+    q_seqs, r_seqs, pid_seqs, diff_seqs = q_seqs * mask_seqs, r_seqs * mask_seqs, pid_seqs * mask_seqs, diff_seqs * mask_seqs
+
+    return q_seqs, r_seqs, pid_seqs, diff_seqs, mask_seqs
+    #|q_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
+    #|r_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
+    #|mask_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
+
 
 # get_optimizer
 def get_optimizers(model, config):
