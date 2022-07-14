@@ -94,7 +94,7 @@ def Mlm4BertTest(r_seqs, mask_seqs):
     # |mlm_r_seqs| = (bs, n)
     # |mask_seqs| = (bs, n)
 
-class MonoConvBert4ktPlusTrainer():
+class MonaConvBert4ktPlusTrainer():
 
     def __init__(
         self, 
