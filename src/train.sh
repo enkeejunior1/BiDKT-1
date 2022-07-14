@@ -1,6 +1,6 @@
 #!/bin/bash
-dataset_names="assist2009_pid_diff"
-algebra_dataset_names="algebra2005_pid algebra2006_pid"
+dataset_names="assist2009_pid_diff assist2012_pid_diff assist2017_pid_diff"
+algebra_dataset_names="algebra2005_pid_diff algebra2006_pid_diff"
 
 for dataset_name in ${dataset_names}
 do
@@ -33,3 +33,4 @@ do
     --fivefold True \
     --n_epochs 1000
 done
+

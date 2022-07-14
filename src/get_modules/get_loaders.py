@@ -20,6 +20,10 @@ from dataloaders.algebra2006_pid_time_loader import ALGEBRA2006_PID_Time
 from dataloaders.assist2012_pid_time_loader import ASSIST2012_PID_Time
 from dataloaders.assist2017_pid_time_loader import ASSIST2017_PID_Time
 from dataloaders.assist2009_pid_diff_loader import ASSIST2009_PID_DIFF
+from dataloaders.assist2012_pid_diff_loader import ASSIST2012_PID_DIFF
+from dataloaders.assist2017_pid_diff_loader import ASSIST2017_PID_DIFF
+from dataloaders.algebra2005_pid_diff_loader import ALGEBRA2005_PID_DIFF
+from dataloaders.algebra2006_pid_diff_loader import ALGEBRA2006_PID_DIFF
 
 # choose the loaders
 def get_loaders(config, idx=None):
@@ -163,6 +167,34 @@ def get_loaders(config, idx=None):
         collate = pid_time_collate_fn
     elif config.dataset_name == "assist2009_pid_diff":
         dataset = ASSIST2009_PID_DIFF(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+        num_diff = dataset.num_diff
+        collate = pid_diff_collate_fn
+    elif config.dataset_name == "assist2012_pid_diff":
+        dataset = ASSIST2012_PID_DIFF(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+        num_diff = dataset.num_diff
+        collate = pid_diff_collate_fn
+    elif config.dataset_name == "assist2017_pid_diff":
+        dataset = ASSIST2017_PID_DIFF(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+        num_diff = dataset.num_diff
+        collate = pid_diff_collate_fn
+    elif config.dataset_name == "algebra2005_pid_diff":
+        dataset = ALGEBRA2005_PID_DIFF(config.max_seq_len)
+        num_q = dataset.num_q
+        num_r = dataset.num_r
+        num_pid = dataset.num_pid
+        num_diff = dataset.num_diff
+        collate = pid_diff_collate_fn
+    elif config.dataset_name == "algebra2006_pid_diff":
+        dataset = ALGEBRA2006_PID_DIFF(config.max_seq_len)
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid
