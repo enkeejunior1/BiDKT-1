@@ -1,11 +1,6 @@
 #!/bin/bash
-
-model_names="monoconvbert4kt_plus"
-dataset_names1="assist2012_pid assist2017_pid"
-dataset_names2="algebra2005_pid algebra2006_pid"
-dataset_names3="assist2012_pid assist2017_pid algebra2005_pid algebra2006_pid"
-dataset_names4="assist2009_pid assist2012_pid assist2017_pid algebra2005_pid algebra2006_pid"
-
+model_names="monaconvbert4kt_plus convbert4kt_plus"
+dataset_names="assist2009_pid assist2012_pid assist2017_pid algebra2005_pid algebra2006_pid"
 
 for dataset_name1 in ${dataset_names1}
 do
@@ -24,7 +19,6 @@ do
     --n_epochs 1000
 done
 
-
 for dataset_name2 in ${dataset_names2}
 do
     python \
@@ -42,7 +36,6 @@ do
     --n_epochs 1000
 done
 
-
 for dataset_name3 in ${dataset_names3}
 do
         python \
@@ -58,7 +51,6 @@ do
         --fivefold True \
         --n_epochs 1000
 done
-
 
 for dataset_name4 in ${dataset_names4}
 do

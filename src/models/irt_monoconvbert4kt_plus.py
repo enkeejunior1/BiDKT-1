@@ -4,6 +4,10 @@ import numpy as np
 import math
 import torch.nn.functional as F
 
+"""
+2중 인코더 구조로 만들고, 최종적으로 아웃풋에서 서로의 차를 구해서 sigmoid로 씌우기
+"""
+
 # SeparableConv1D
 class SeparableConv1D(nn.Module):
     def __init__(self, input_filters, output_filters, kernel_size):

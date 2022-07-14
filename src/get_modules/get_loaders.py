@@ -20,15 +20,16 @@ from dataloaders.algebra2006_pid_time_loader import ALGEBRA2006_PID_Time
 from dataloaders.assist2012_pid_time_loader import ASSIST2012_PID_Time
 from dataloaders.assist2017_pid_time_loader import ASSIST2017_PID_Time
 
-#get_loaders를 따로 만들고, 이 함수를 train에서 불러내기
+# choose the loaders
 def get_loaders(config, idx=None):
 
-    #1. dataset 선택
+    #1. select the dataset
     if config.dataset_name == "assist2015":
         dataset = ASSIST2015(config.max_seq_len)
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = None
+        # collate are different
         collate = collate_fn
     elif config.dataset_name == "assist2009":
         dataset = ASSIST2009(config.max_seq_len)
@@ -83,6 +84,7 @@ def get_loaders(config, idx=None):
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid
+        # pid_collate_fn give you more data
         collate = pid_collate_fn
     elif config.dataset_name == "assist2017_pid":
         dataset = ASSIST2017_PID(config.max_seq_len)  
@@ -119,28 +121,31 @@ def get_loaders(config, idx=None):
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid
-        collate = pid_time_collate_fn #시간까지 추출
+        # for time
+        collate = pid_time_collate_fn
     elif config.dataset_name == "algebra2006_pid_time":
         dataset = ALGEBRA2006_PID_Time(config.max_seq_len)
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid
-        collate = pid_time_collate_fn #시간까지 추출
+        collate = pid_time_collate_fn
     elif config.dataset_name == "assist2012_pid_time":
         dataset = ASSIST2012_PID_Time(config.max_seq_len)
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid
-        collate = pid_time_collate_fn #시간까지 추출
+        collate = pid_time_collate_fn
     elif config.dataset_name == "assist2017_pid_time":
         dataset = ASSIST2017_PID_Time(config.max_seq_len)
         num_q = dataset.num_q
         num_r = dataset.num_r
         num_pid = dataset.num_pid
-        collate = pid_time_collate_fn #시간까지 추출
+        collate = pid_time_collate_fn
     else:
         print("Wrong dataset_name was used...")
 
+    # 2. data chunk
+    # if fivefold = True
     if config.fivefold == True:
 
         first_chunk = Subset(dataset, range( int(len(dataset) * 0.2) ))
@@ -149,19 +154,24 @@ def get_loaders(config, idx=None):
         fourth_chunk = Subset(dataset, range( int(len(dataset) * 0.6), int(len(dataset) * 0.8) ))
         fifth_chunk = Subset(dataset, range( int(len(dataset) * 0.8), int(len(dataset)) ))
 
-        #idx는 함수에서 매개변수로 받아옴
+        # idx from main
+        # fivefold first
         if idx == 0:
-            #전체의 0.8
+            # train_dataset is 0.8 of whole dataset
             train_dataset = ConcatDataset([second_chunk, third_chunk, fourth_chunk, fifth_chunk])
 
-            valid_size = int( len(train_dataset) * config.valid_ratio) #train의 0.1
-            train_size = int( len(train_dataset) ) - valid_size #train의 0.9
+            # valid_size is 0.1 of train_dataset
+            valid_size = int( len(train_dataset) * config.valid_ratio)
+            # train_size is 0.9 of train_dataset
+            train_size = int( len(train_dataset) ) - valid_size
             
             train_dataset, valid_dataset = random_split(
                 train_dataset, [ train_size, valid_size ]
             )
-            #전체의 0.2
+
+            # test_dataset is 0.2 of whole dataset
             test_dataset = first_chunk
+        # fivefold second
         elif idx == 1:
             train_dataset = ConcatDataset([first_chunk, third_chunk, fourth_chunk, fifth_chunk])
             valid_size = int( len(train_dataset) * config.valid_ratio) #train의 0.1
@@ -171,6 +181,7 @@ def get_loaders(config, idx=None):
                 train_dataset, [ train_size, valid_size ]
             )
             test_dataset = second_chunk
+        # fivefold third
         elif idx == 2:
             train_dataset = ConcatDataset([first_chunk, second_chunk, fourth_chunk, fifth_chunk])
             valid_size = int( len(train_dataset) * config.valid_ratio) #train의 0.1
@@ -180,6 +191,7 @@ def get_loaders(config, idx=None):
                 train_dataset, [ train_size, valid_size ]
             )
             test_dataset = third_chunk
+        # fivefold fourth
         elif idx == 3:
             train_dataset = ConcatDataset([first_chunk, second_chunk, third_chunk, fifth_chunk])
             valid_size = int( len(train_dataset) * config.valid_ratio) #train의 0.1
@@ -189,6 +201,7 @@ def get_loaders(config, idx=None):
                 train_dataset, [ train_size, valid_size ]
             )
             test_dataset = fourth_chunk
+        # fivefold fifth
         elif idx == 4:
             train_dataset = ConcatDataset([first_chunk, second_chunk, third_chunk, fourth_chunk])
             valid_size = int( len(train_dataset) * config.valid_ratio) #train의 0.1
@@ -198,34 +211,33 @@ def get_loaders(config, idx=None):
                 train_dataset, [ train_size, valid_size ]
             )
             test_dataset = fifth_chunk
+    # fivefold = False
     else:
-        #3. train, test 사이즈 나누기
-        train_size = int( len(dataset) * config.train_ratio * (1 - config.valid_ratio)) #0.8의 0.9
-        valid_size = int( len(dataset) * config.train_ratio * config.valid_ratio) #0.8의 0.1
-        test_size = len(dataset) - (train_size + valid_size) #전체의 0.2
+        train_size = int( len(dataset) * config.train_ratio * (1 - config.valid_ratio))
+        valid_size = int( len(dataset) * config.train_ratio * config.valid_ratio)
+        test_size = len(dataset) - (train_size + valid_size)
 
-        #train, test 사이즈 나누기
         train_dataset, valid_dataset, test_dataset = random_split(
             dataset, [ train_size, valid_size, test_size ]
             )
 
-    #4. DataLoader 불러오기
+    # 3. get DataLoader
     train_loader = DataLoader(
         train_dataset,
         batch_size = config.batch_size,
-        shuffle = True,
+        shuffle = True, # train_loader use shuffle
         collate_fn = collate
     )
     valid_loader = DataLoader(
         valid_dataset,
         batch_size = config.batch_size,
-        shuffle = False,
+        shuffle = False, # valid_loader don't use shuffle
         collate_fn = collate
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size = config.batch_size,
-        shuffle = False, #test
+        shuffle = False, # test_loader don't use shuffle
         collate_fn = collate
     )
 
