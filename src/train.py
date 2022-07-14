@@ -69,10 +69,10 @@ if __name__ == "__main__":
         test_scores_list = []
         
         for idx in range(5):
-            train_loader, valid_loader, test_loader, num_q, num_r, num_pid = get_loaders(config, idx)
+            train_loader, valid_loader, test_loader, num_q, num_r, num_pid, num_diff = get_loaders(config, idx)
             train_auc_scores, valid_auc_scores, \
                  best_valid_score, test_auc_score,  \
-                    record_time = main(config, train_loader, valid_loader, test_loader, num_q, num_r, num_pid)
+                    record_time = main(config, train_loader, valid_loader, test_loader, num_q, num_r, num_pid, num_diff)
             test_scores_list.append(test_auc_score)
         # mean the test_scores_list
         test_auc_score = sum(test_scores_list)/5
