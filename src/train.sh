@@ -1,5 +1,5 @@
 #!/bin/bash
-dataset_names="assist2009_pid assist2012_pid assist2017_pid"
+dataset_names="assist2009_pid_diff"
 algebra_dataset_names="algebra2005_pid algebra2006_pid"
 
 for dataset_name in ${dataset_names}
