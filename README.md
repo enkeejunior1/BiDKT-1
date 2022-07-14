@@ -11,11 +11,9 @@ The this repo is about developing KT-BERT which is used BERT to knowledge tracin
 5. If model_name contain the "_plus", you must train that model with pid_loader; assist2009_pid, assist2017_pid...
 6. If you want to train the model, you can use script like this.
 
-'''
-
+```
 python train.py --model_fn model.pth --model_name bert4kt_plus --dataset_name assist2009_pid
-
-'''
+```
 
 
 # Requirements
