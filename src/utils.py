@@ -142,6 +142,46 @@ def pid_diff_collate_fn(batch, pad_val=-1):
     #|r_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
     #|mask_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
 
+def pid_diff_pt_collate_fn(batch, pad_val=-1):
+
+    q_seqs = []
+    r_seqs = []
+    pid_seqs = []
+    diff_seqs = []
+    pt_seqs = []
+
+    for q_seq, r_seq, pid_seq, diff_seq, pt_seq in batch:
+
+        q_seqs.append(torch.Tensor(q_seq))
+        r_seqs.append(torch.Tensor(r_seq))
+        pid_seqs.append(torch.Tensor(pid_seq))
+        diff_seqs.append(torch.Tensor(diff_seq))
+        pt_seqs.append(torch.Tensor(pt_seq))
+
+    q_seqs = pad_sequence(
+        q_seqs, batch_first=True, padding_value=pad_val
+    )
+    r_seqs = pad_sequence(
+        r_seqs, batch_first=True, padding_value=pad_val
+    )
+    pid_seqs = pad_sequence(
+        pid_seqs, batch_first=True, padding_value=pad_val
+    )
+    diff_seqs = pad_sequence(
+        diff_seqs, batch_first=True, padding_value=pad_val
+    )
+    pt_seqs = pad_sequence(
+        pt_seqs, batch_first=True, padding_value=pad_val
+    )
+
+    mask_seqs = (q_seqs != pad_val)
+
+    q_seqs, r_seqs, pid_seqs, diff_seqs, pt_seqs = q_seqs * mask_seqs, r_seqs * mask_seqs, pid_seqs * mask_seqs, diff_seqs * mask_seqs, pt_seqs * mask_seqs
+
+    return q_seqs, r_seqs, pid_seqs, diff_seqs, pt_seqs, mask_seqs
+    #|q_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
+    #|r_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
+    #|mask_seqs| = (batch_size, maximum_sequence_length_in_the_batch)
 
 # get_optimizer
 def get_optimizers(model, config):
@@ -225,6 +265,16 @@ class EarlyStopping:
             print(f'Validation loss was updated ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
         torch.save(model.state_dict(), self.path)
         self.val_loss_min = val_loss
+
+def grp_range(a):
+    count = np.unique(a,return_counts=1)[1]
+
+    idx = count.cumsum()
+    id_arr = np.ones(idx[-1],dtype=int)
+    id_arr[0] = 0
+    id_arr[idx[:-1]] = -count[:-1]+1
+    out = id_arr.cumsum()[np.argsort(a).argsort()]
+    return out
 
 #recoder
 def recorder(test_auc_score, record_time, config):
