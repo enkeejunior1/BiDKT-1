@@ -1,15 +1,16 @@
 import torch
 import torch.nn as nn
-
+import numpy as np
 import math
+import torch.nn.functional as F
 
 # SeparableConv1D
 class SeparableConv1D(nn.Module):
     def __init__(self, input_filters, output_filters, kernel_size):
         super().__init__()
 
-        # input_filters = 512 <- hs
-        # output_filters = 256 <- all_attn_h_size
+        # input_filters = 512 <- hidden_size
+        # output_filters = 256 <- all_attn_head_size
 
         self.depthwise = nn.Conv1d(input_filters, input_filters, kernel_size=kernel_size, groups=input_filters, padding=kernel_size //2, bias = False)
         self.pointwise = nn.Conv1d(input_filters, output_filters, kernel_size=1, bias=False)
@@ -31,35 +32,36 @@ class SeparableConv1D(nn.Module):
         # |x| = (bs, hs/2(all_attn_h_size), n)
         return x
 
-# huggingface conv bert
-class ConvBertSelfAttention(nn.Module):
+# Thank for the Huggingface and Author of AKT
+# Combined the Monotonic Attention and Span Dynamic Convolutional Attention
+class MonotonicConvolutionalMultiheadAttention(nn.Module):
     # hidden % n_splits == 0
     def __init__(self, hidden_size, n_splits, dropout_p, head_ratio=2, conv_kernel_size=9):
         super().__init__()
-
-        #n_splits = 16, head_ratio = 2
+        # default: n_splits = 16, head_ratio = 2
+        
         new_num_attention_heads = n_splits // head_ratio
         self.num_attention_heads = new_num_attention_heads
-        # self.new_num_attention_heads = 8
+        # default: self.new_num_attention_heads = 8
 
         self.head_ratio = head_ratio
-        # self.head_ratio = 2
+        # default: self.head_ratio = 2
 
         self.conv_kernel_size = conv_kernel_size
-        # self.conv_kernel_size = 9
+        # default: self.conv_kernel_size = 9
 
         self.attention_head_size = hidden_size // n_splits
-        # self.attention_head_size = 512//16 = 32
+        # default: self.attention_head_size = 512//16 = 32
 
         self.all_head_size = self.num_attention_heads * self.attention_head_size
-        # self.all_head_size = 32 * 8 = 256
+        # default: self.all_head_size = 32 * 8 = 256
 
-        # q, k, v layers
+        # linear layers for query, key, value 
         self.query = nn.Linear(hidden_size, self.all_head_size, bias=False) # 512 -> 256
         self.key = nn.Linear(hidden_size, self.all_head_size, bias=False) # 512 -> 256
         self.value = nn.Linear(hidden_size, self.all_head_size, bias=False) # 512 -> 256
 
-        # conv layers
+        # layers for span dynamic convolutional attention
         self.key_conv_attn_layer = SeparableConv1D(
             hidden_size, self.all_head_size, self.conv_kernel_size
         )
@@ -71,6 +73,9 @@ class ConvBertSelfAttention(nn.Module):
         self.unfold = nn.Unfold(
             kernel_size=[self.conv_kernel_size, 1], padding=[int((self.conv_kernel_size - 1) / 2), 0]
         )
+        
+        # this is for the distance function
+        self.gammas = nn.Parameter(torch.zeros(self.num_attention_heads, 1, 1))
 
         self.dropout = nn.Dropout(dropout_p)
 
@@ -102,7 +107,7 @@ class ConvBertSelfAttention(nn.Module):
         ##############
         # conv layer #
         ##############
-        # conv를 거친 key와 linear를 거친 query의 element-wise multiply
+        # element-wise multiply of conv key and query 
         conv_attn_layer = torch.multiply(mixed_key_conv_attn_layer, mixed_query_layer)
         # |conv_attn_layer| = (bs, n, hs/2(all_attn_h_size))
         conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
@@ -112,7 +117,7 @@ class ConvBertSelfAttention(nn.Module):
         conv_kernel_layer = torch.softmax(conv_kernel_layer, dim=1)
         # |conv_kernel_layer| = (51200, 9, 1), 각 head별 확률값들을 도출하는 듯
 
-        # Q X K와 V가 결합되는 부분
+        # q X k is matmul with v
         conv_out_layer = self.conv_out_layer(V)
         # |conv_out_layer| = (bs, n, hs/2(all_attn_h_size))
         conv_out_layer = torch.reshape(conv_out_layer, [batch_size, -1, self.all_head_size])
@@ -133,29 +138,42 @@ class ConvBertSelfAttention(nn.Module):
         )
         # |conv_out_layer| = (bs, n, hs/2(all_attn_h_size), conv_kernal_size)
         conv_out_layer = torch.reshape(conv_out_layer, [-1, self.attention_head_size, self.conv_kernel_size])
-        # |conv_out_layer| = (51200, 32, 9)
-        # Q X K와 V가 결합되는 부분
+        # |conv_out_layer|, default = (51200, 32, 9)
+        # matmul(q X k, v)
         conv_out_layer = torch.matmul(conv_out_layer, conv_kernel_layer)
-        # |conv_out_layer| = (51200, 32, 1)
+        # |conv_out_layer|, default = (51200, 32, 1)
         conv_out_layer = torch.reshape(conv_out_layer, [-1, self.all_head_size])
-        # |conv_out_layer| = (6400, 256)
+        # |conv_out_layer|, default = (6400, 256)
 
-        ##############
+        ###################
         # self_attn layer #
-        ##############
+        ###################
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+        # |attention_scores| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-        # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
+        # |attention_scores| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
+
+        #####################
+        # distance function #
+        #####################
+        dist_scores = self.dist_func(attention_scores, mask)
+        # |dist_scores| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
+        m = nn.Softplus()
+        # gamma is learnable decay rate parameter
+        gamma = -1.0 * m(self.gammas).unsqueeze(0)
+        # Now after do exp(gamma * distance) and then clamp to 1e-5 to 1e-5
+        total_effect = torch.clamp(
+            torch.clamp((dist_scores * gamma).exp(), min=1e-5), max=1e5
+        )
+        # |total_effect| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
+
+        attention_scores = attention_scores * total_effect
+        # |attention_scores| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
 
         # |mask| = (bs, n)
         attention_mask = self.get_extended_attention_mask(mask)
-        # |attention_mask| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
-        # 기존 코드에서는 원하는 위치는 0, 마스크 위치에는 -10000.0을 두어서 처리하려 함
-        # attention_scores = attention_scores + attention_mask
-        # 여기서는 attention_mask를 아래처럼 처리함
-
-        attention_scores.masked_fill_(attention_mask==0, -1e8)
+        # |attention_mask| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
+        attention_scores = attention_scores.masked_fill_(attention_mask==0, -1e8)
         # |attention_scores| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
@@ -168,43 +186,95 @@ class ConvBertSelfAttention(nn.Module):
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
         # |context_layer| = (bs, n, n_attn_head, attn_head_size) = (64, 100, 8, 32)
         
+        #########################################
+        # concat with conv and self_attn values #
+        #########################################
         conv_out = torch.reshape(conv_out_layer, [batch_size, -1, self.num_attention_heads, self.attention_head_size])
         # |conv_out| = (bs, n, n_attn_head, attn_head_size) = (64, 100, 8, 32)
-
-        #####
-        # conv와 self_attn이 concat
-        #####
         context_layer = torch.cat([context_layer, conv_out], 2)
         # |context_layer| = (bs, n, n_attn_head * 2, attn_head_size) = (64, 100, 16, 32)
-        
         new_context_layer_shape = context_layer.size()[:-2] + \
              (self.head_ratio * self.all_head_size,)
         # new_context_layer_shape = (bs, n, hs)
         context_layer = context_layer.view(*new_context_layer_shape)
         # |context_layer| = (bs, n, hs)
 
-        outputs = context_layer # 필요하면 함께 출력하기, attention_probs
+        outputs = context_layer
         # |context_layer| = (bs, n, hs)
+        # if you need attention_probs, add the return
         # |attention_probs| = (bs, n_attn_head, n, n) = (64, 8, 100, 100)
 
         # |outputs| = (bs, n, hs)
         return outputs
 
+    # Thanks for the AKT's author and Upstage
+    # this is the distance function, this function don't use grad
+    @torch.no_grad()
+    def dist_func(self, attention_scores, mask):
 
+        scores = attention_scores
+        bs, head, seqlen = scores.size(0), scores.size(1), scores.size(2)
+
+        x1 = torch.arange(seqlen).expand(seqlen, -1)
+        x2 = x1.transpose(0, 1).contiguous()
+
+        attention_mask = self.get_extended_attention_mask(mask)
+
+        scores_ = scores.masked_fill_(attention_mask == 0, -1e32)
+
+        scores_ = F.softmax(scores_, dim=-1)
+        scores_ = scores_ * attention_mask.float()
+
+        distcum_scores = torch.cumsum(scores_, dim=-1)
+        disttotal_scores = torch.sum(scores_, dim=-1, keepdim=True)
+        """
+        >>> x1-x2
+            tensor([[ 0,  1,  2,  3,  4],
+                    [-1,  0,  1,  2,  3],
+                    [-2, -1,  0,  1,  2],
+                    [-3, -2, -1,  0,  1],
+                    [-4, -3, -2, -1,  0]])
+
+        >>> torch.abs(x1-x2)
+            tensor([[0, 1, 2, 3, 4],
+                    [1, 0, 1, 2, 3],
+                    [2, 1, 0, 1, 2],
+                    [3, 2, 1, 0, 1],
+                    [4, 3, 2, 1, 0]])
+        """     
+        device = distcum_scores.get_device()
+        position_effect = torch.abs(x1 - x2)[None, None, :, :].type(
+            torch.FloatTensor
+        ) 
+        # |position_effect| = (1, 1, seqlen, seqlen)
+        position_effect = position_effect.to(device)
+        
+        # dist_score => d(t, tau)
+        dist_scores = torch.clamp(
+            (disttotal_scores - distcum_scores) * position_effect, min=0.0
+        )
+
+        dist_scores = dist_scores.sqrt().detach()
+
+        # |dist_scores| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
+        return dist_scores
+
+    # this is for attention mask
     @torch.no_grad()
     def get_extended_attention_mask(self, mask):
         # |mask| = (bs, n)
         mask_shape = mask.size() + (mask.size(1), self.num_attention_heads)
         # mask_shape = (bs, n, n, n_attn_head)
         mask_enc = mask.unsqueeze(-1).expand(mask.size(0), mask.size(1), mask.size(1) * self.num_attention_heads).bool()
-        #|mask_enc| = (bs, n, n * n_attn_head)
+        # |mask_enc| = (bs, n, n * n_attn_head)
 
         mask_enc = mask_enc.view(*mask_shape)
-        #|mask_enc| = (bs, n, n, n_attn_head) = (64, 100, 100, 8)
+        # |mask_enc| = (bs, n, n, n_attn_head), default = (64, 100, 100, 8)
 
         return mask_enc.permute(0, 3, 2, 1)
+        # |mask_enc| = (bs, n_attn_head, n, n), default = (64, 8, 100, 100)
 
-    # attention 계산을 위해 마지막 차원을 n_attn_head의 수만큼 나누고, 새로운 차원으로 만들어줌
+    # for attention, last dim will be divied to n_attn_head, and get a new shape
     def transpose_for_scores(self, x):
         # |x| = (bs, n, hs/2(all_attn_h_size))
 
@@ -227,7 +297,7 @@ class EncoderBlock(nn.Module):
 
     def __init__(
         self,
-        hidden_size, #512
+        hidden_size, # default = 512
         n_splits,
         use_leakyrelu,
         max_seq_len,
@@ -237,14 +307,14 @@ class EncoderBlock(nn.Module):
 
         self.use_leakyrelu = use_leakyrelu
 
-        self.attn = ConvBertSelfAttention(hidden_size, n_splits, dropout_p)
-        self.attn_norm = nn.LayerNorm(hidden_size) #attention을 위한 layerNorm
+        self.attn = MonotonicConvolutionalMultiheadAttention(hidden_size, n_splits, dropout_p)
+        self.attn_norm = nn.LayerNorm(hidden_size)
         self.attn_dropout = nn.Dropout(dropout_p)
 
         self.fc = nn.Sequential(
             nn.Linear(hidden_size, hidden_size * 4),
+            # if you want to use gelu, then you have to change config option
             nn.LeakyReLU() if self.use_leakyrelu else self.gelu(),
-            #nn.LeakyReLU() if self.use_leakyrelu else nn.GELU(),
             nn.Linear(hidden_size * 4, hidden_size),
         )
         self.fc_norm = nn.LayerNorm(hidden_size)
@@ -270,6 +340,7 @@ class EncoderBlock(nn.Module):
 
         return z, mask
 
+    # Thanks for the upstage
     # upstage's gelu
     def gelu(x):
         """Upstage said:
@@ -282,10 +353,10 @@ class EncoderBlock(nn.Module):
         """
         return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
-
+# Thanks for the Kihyeon Kim
 class MySequential(nn.Sequential):
-    # 원래 sequential은 x 하나만 받을 수 있어서 상속받아 새로 정의
-    # input을 *x로 받아서 튜플도 받을 수 있게 처리
+    # New Sequential function
+    # this can handle the tuple also
     def forward(self, *x):
         # nn.Sequential class does not provide multiple input arguments and returns.
         # Thus, we need to define new class to solve this issue.
@@ -296,14 +367,15 @@ class MySequential(nn.Sequential):
 
         return x
 
-
-class ConvBert4ktPlus(nn.Module):
+# This is the main model
+class MonaConvBert4ktPlusDiffPt(nn.Module):
 
     def __init__(
         self,
         num_q,
         num_r,
         num_pid,
+        num_diff,
         hidden_size,
         output_size,
         num_head,
@@ -314,8 +386,9 @@ class ConvBert4ktPlus(nn.Module):
         dropout_p=.1,
     ):
         self.num_q = num_q
-        self.num_r = num_r + 2 # <PAD>와 <MASK>를 추가한만큼의 Emb값이 필요, 여기에 추가로 1을 더 더해줌
+        self.num_r = num_r + 2 # '+2' is for 1(correct), 0(incorrect), <PAD>, <MASK>
         self.num_pid = num_pid
+        self.num_diff = 101 # hard coding
 
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -328,16 +401,20 @@ class ConvBert4ktPlus(nn.Module):
 
         super().__init__()
 
-        # question embedding
+        # concept embedding
         self.emb_q = nn.Embedding(self.num_q, self.hidden_size).to(self.device)
         # response embedding
         self.emb_r = nn.Embedding(self.num_r, self.hidden_size).to(self.device)
-        # positional embedding
+        # problem embedding
         self.emb_pid = nn.Embedding(self.num_pid, self.hidden_size).to(self.device)
+        # difficult embedding
+        self.emb_diff = nn.Embedding(self.num_diff, self.hidden_size).to(self.device)
+        # past trial embedding
         self.emb_p = nn.Embedding(self.max_seq_len, self.hidden_size).to(self.device)
+
         self.emb_dropout = nn.Dropout(self.dropout_p)
 
-        # MySequential을 활용해 필요한만큼 encoder block을 만듦
+        # Using MySequential
         self.encoder = MySequential(
             *[EncoderBlock(
                 hidden_size,
@@ -351,10 +428,11 @@ class ConvBert4ktPlus(nn.Module):
         self.generator = nn.Sequential(
             nn.LayerNorm(hidden_size), # Only for Pre-LN Transformer.
             nn.Linear(hidden_size, output_size),
-            nn.Sigmoid() # binary
+            nn.Sigmoid() # Binary
         )
 
-     # Learnable positional embedding
+    # Positional embedding with no_grad
+    @torch.no_grad()
     def _positional_embedding(self, q):
         # |q| = (bs, n)
         # |r| = (bs, n)
@@ -368,17 +446,14 @@ class ConvBert4ktPlus(nn.Module):
 
         return pos_emb
 
-    def forward(self, q, r, pid, mask):
+    def forward(self, q, r, pid, diff, pt, mask):
         # |q| = (bs, n)
         # |r| = (bs, n)
         # |mask| = (bs, n)
 
-        # Mask to prevent having attention weight on padding position.
-        # with torch.no_grad():
-        #     mask_enc = mask.unsqueeze(-1).expand(mask.size(0), mask.size(1), mask.size(1)).bool()
-        #      # |mask_enc| = (bs, n, n), (bs, n_attn_head, n, attn_head_size)
+        # pd를 attention에 반영해보기
 
-        emb = self.emb_q(q) + self.emb_r(r) + self.emb_pid(pid) + self._positional_embedding(q)
+        emb = self.emb_q(q) + self.emb_r(r) + self.emb_pid(pid) + self.emb_diff(diff) + self._positional_embedding(q) 
         # |emb| = (bs, n, emb_size)
 
         z = self.emb_dropout(emb)

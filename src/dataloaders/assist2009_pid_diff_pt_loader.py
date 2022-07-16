@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 
 DATASET_DIR = "../datasets/assistments09/preprocessed_df.csv"
 
-class ASSIST2009_PID_DIFF(Dataset):
+class ASSIST2009_PID_DIFF_PT(Dataset):
     def __init__(self, max_seq_len, dataset_dir=DATASET_DIR) -> None:
         super().__init__()
 
@@ -13,7 +13,7 @@ class ASSIST2009_PID_DIFF(Dataset):
         
         self.q_seqs, self.r_seqs, self.q_list, self.u_list, \
             self.r_list, self.q2idx, self.u2idx, self.pid_seqs, \
-                self.diff_seqs, self.pid_list, self.diff_list = self.preprocess() #가장 아래에서 각각의 요소를 가져옴
+                self.diff_seqs, self.pt_seqs, self.pid_list, self.diff_list = self.preprocess() #가장 아래에서 각각의 요소를 가져옴
 
         self.num_u = self.u_list.shape[0]
         self.num_q = self.q_list.shape[0]
@@ -23,14 +23,14 @@ class ASSIST2009_PID_DIFF(Dataset):
 
         # match_seq_len은 경우에 따라 설정하기 -> 사용하려면 parameter에 seq_len을 추가해야 함
         # match_seq_len을 거치면, 모든 데이터는 101개로 통일되고, 빈칸인 부분은 -1로 전처리되어있음
-        self.q_seqs, self.r_seqs, self.pid_seqs, self.diff_seqs = \
-            self.match_seq_len(self.q_seqs, self.r_seqs, self.pid_seqs, self.diff_seqs, max_seq_len) #아래 method를 한번 거치도록 처리
+        self.q_seqs, self.r_seqs, self.pid_seqs, self.diff_seqs, self.pt_seqs = \
+            self.match_seq_len(self.q_seqs, self.r_seqs, self.pid_seqs, self.diff_seqs, self.pt_seqs, max_seq_len) #아래 method를 한번 거치도록 처리
 
         self.len = len(self.q_seqs)
 
     def __getitem__(self, index):
         #출력되는 벡터는 모두 101개로 전처리되어있고, 만약 빈칸이 있는 데이터의 경우에는 -1로 채워져있음
-        return self.q_seqs[index], self.r_seqs[index], self.pid_seqs[index], self.diff_seqs[index]
+        return self.q_seqs[index], self.r_seqs[index], self.pid_seqs[index], self.diff_seqs[index], self.pt_seqs[index]
 
     def __len__(self):
         return self.len
@@ -49,17 +49,16 @@ class ASSIST2009_PID_DIFF(Dataset):
         pid2idx = {pid: idx for idx, pid in enumerate(pid_list)} 
 
         # difficult
-        diff = np.round(df.groupby('item_id')['correct'].mean() * 100)
-        diff_list = np.unique(df.groupby('item_id')['correct'].mean())
-        diff2idx = {d: idx for idx, d in enumerate(diff_list)}
 
-        #diff.values
-        #diff.index
+        diff = np.round(df.groupby('item_id')['correct'].mean() * 100)
+        diff_list = np.unique(diff)
+        #diff2idx = {d: idx for idx, d in enumerate(diff_list)}
 
         q_seqs = [] #로그 기준으로 각 user별 질문 목록을 담은 리스트
         r_seqs = [] #로그 기준으로 각 user별 정답 목록을 담은 리스트
         pid_seqs = []
         diff_seqs = []
+        pt_seqs = []
 
         for u in u_list:
             df_u = df[df["user_id"] == u]
@@ -73,18 +72,20 @@ class ASSIST2009_PID_DIFF(Dataset):
             r_seqs.append(r_seq)
             pid_seqs.append(pid_seq)
             diff_seqs.append(diff_seq)
+            pt_seqs.append(self._cumcount(q_seq))
 
-        return q_seqs, r_seqs, q_list, u_list, r_list, q2idx, u2idx, pid_seqs, diff_seqs, pid_list, diff_list #끝에 두개 추가
+        return q_seqs, r_seqs, q_list, u_list, r_list, q2idx, u2idx, pid_seqs, diff_seqs, pt_seqs, pid_list, diff_list #끝에 두개 추가
 
     #수정할 것
-    def match_seq_len(self, q_seqs, r_seqs, pid_seqs, diff_seqs, max_seq_len, pad_val=-1):
+    def match_seq_len(self, q_seqs, r_seqs, pid_seqs, diff_seqs, pt_seqs, max_seq_len, pad_val=-1):
 
         proc_q_seqs = []
         proc_r_seqs = []
         proc_pid_seqs = []
         proc_diff_seqs = []
+        proc_pt_seqs = []
 
-        for q_seq, r_seq, pid_seq, diff_seq in zip(q_seqs, r_seqs, pid_seqs, diff_seqs):
+        for q_seq, r_seq, pid_seq, diff_seq, pt_seq in zip(q_seqs, r_seqs, pid_seqs, diff_seqs, pt_seqs):
 
             #max_seq_len(100)보다 작거나 같은 데이터는 넘기고, 100보다 큰 데이터는 while문을 통과하게 됨
             #while을 통과할 경우, 100개씩 데이터를 떼서 proc에 넣음
@@ -94,6 +95,7 @@ class ASSIST2009_PID_DIFF(Dataset):
                 proc_r_seqs.append(r_seq[i:i + max_seq_len - 1])
                 proc_pid_seqs.append(pid_seq[i:i + max_seq_len - 1])
                 proc_diff_seqs.append(diff_seq[i:i + max_seq_len - 1])
+                proc_pt_seqs.append(pt_seq[i:i + max_seq_len - 1])
 
                 i += max_seq_len
 
@@ -130,5 +132,32 @@ class ASSIST2009_PID_DIFF(Dataset):
                     ]
                 )
             )
+            proc_pt_seqs.append(
+                np.concatenate(
+                    [
+                        pt_seq[i:],
+                        np.array([pad_val] * (i + max_seq_len - len(q_seq)))
+                    ]
+                )
+            )
 
-        return proc_q_seqs, proc_r_seqs, proc_pid_seqs, proc_diff_seqs
+        return proc_q_seqs, proc_r_seqs, proc_pid_seqs, proc_diff_seqs, proc_pt_seqs
+
+    def _dfill(self, a):
+        n = a.size
+        b = np.concatenate([[0], np.where(a[:-1] != a[1:])[0] + 1, [n]])
+        return np.arange(n)[b[:-1]].repeat(np.diff(b))
+
+    def _argunsort(self, s):
+        n = s.size
+        u = np.empty(n, dtype=np.int64)
+        u[s] = np.arange(n)
+        return u
+
+    def _cumcount(self, a):
+        n = a.size
+        s = a.argsort(kind='mergesort')
+        i = self._argunsort(s)
+        b = a[s]
+        return (np.arange(n) - self._dfill(b))[i]
+
