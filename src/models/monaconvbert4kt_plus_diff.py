@@ -430,8 +430,7 @@ class MonaConvBert4ktPlusDiff(nn.Module):
             nn.Sigmoid() # Binary
         )
 
-    # Positional embedding with no_grad
-    @torch.no_grad()
+    # Learnable Positional embedding
     def _positional_embedding(self, q):
         # |q| = (bs, n)
         # |r| = (bs, n)

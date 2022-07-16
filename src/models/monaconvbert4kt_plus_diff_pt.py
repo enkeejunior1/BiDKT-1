@@ -451,6 +451,8 @@ class MonaConvBert4ktPlusDiffPt(nn.Module):
         # |r| = (bs, n)
         # |mask| = (bs, n)
 
+        # pd를 attention에 반영해보기
+
         emb = self.emb_q(q) + self.emb_r(r) + self.emb_pid(pid) + self.emb_diff(diff) + self._positional_embedding(q) 
         # |emb| = (bs, n, emb_size)
 

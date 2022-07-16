@@ -354,8 +354,7 @@ class ConvBert4ktPlus(nn.Module):
             nn.Sigmoid() # binary
         )
 
-     # positional embedding
-    @torch.no_grad()
+     # Learnable positional embedding
     def _positional_embedding(self, q):
         # |q| = (bs, n)
         # |r| = (bs, n)
