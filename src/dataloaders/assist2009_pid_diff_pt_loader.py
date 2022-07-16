@@ -53,16 +53,13 @@ class ASSIST2009_PID_DIFF_PT(Dataset):
         diff_list = np.unique(df.groupby('item_id')['correct'].mean())
         diff2idx = {d: idx for idx, d in enumerate(diff_list)}
 
-        #diff.values
-        #diff.index
-
         q_seqs = [] #로그 기준으로 각 user별 질문 목록을 담은 리스트
         r_seqs = [] #로그 기준으로 각 user별 정답 목록을 담은 리스트
         pid_seqs = []
         diff_seqs = []
         pt_seqs = []
 
-        for u in u_list:
+        for idx, u in enumerate(u_list):
             df_u = df[df["user_id"] == u]
 
             q_seq = np.array([q2idx[q] for q in df_u["skill_id"].values]) # 판다스로 짜는게 좋음
@@ -74,7 +71,7 @@ class ASSIST2009_PID_DIFF_PT(Dataset):
             r_seqs.append(r_seq)
             pid_seqs.append(pid_seq)
             diff_seqs.append(diff_seq)
-            pt_seqs.append(self.grp_range(q_seq))
+            pt_seqs.append(self._cumcount(pid_seq))
 
         return q_seqs, r_seqs, q_list, u_list, r_list, q2idx, u2idx, pid_seqs, diff_seqs, pt_seqs, pid_list, diff_list #끝에 두개 추가
 
@@ -145,11 +142,21 @@ class ASSIST2009_PID_DIFF_PT(Dataset):
 
         return proc_q_seqs, proc_r_seqs, proc_pid_seqs, proc_diff_seqs, proc_pt_seqs
 
-    def grp_range(self, a):
-        count = np.unique(a,return_counts=1)[1]
-        idx = count.cumsum()
-        id_arr = np.ones(idx[-1],dtype=int)
-        id_arr[0] = 0
-        id_arr[idx[:-1]] = -count[:-1]+1
-        out = id_arr.cumsum()[np.argsort(a, kind='mergesort').argsort()]
-        return out
+    def _dfill(self, a):
+        n = a.size
+        b = np.concatenate([[0], np.where(a[:-1] != a[1:])[0] + 1, [n]])
+        return np.arange(n)[b[:-1]].repeat(np.diff(b))
+
+    def _argunsort(self, s):
+        n = s.size
+        u = np.empty(n, dtype=np.int64)
+        u[s] = np.arange(n)
+        return u
+
+    def _cumcount(self, a):
+        n = a.size
+        s = a.argsort(kind='mergesort')
+        i = self._argunsort(s)
+        b = a[s]
+        return (np.arange(n) - self._dfill(b))[i]
+
