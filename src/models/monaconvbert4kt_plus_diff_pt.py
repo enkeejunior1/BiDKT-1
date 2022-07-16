@@ -389,7 +389,6 @@ class MonaConvBert4ktPlusDiffPt(nn.Module):
         self.num_r = num_r + 2 # '+2' is for 1(correct), 0(incorrect), <PAD>, <MASK>
         self.num_pid = num_pid
         self.num_diff = 101 # hard coding
-        self.num_pt = 1000
 
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -411,8 +410,6 @@ class MonaConvBert4ktPlusDiffPt(nn.Module):
         # difficult embedding
         self.emb_diff = nn.Embedding(self.num_diff, self.hidden_size).to(self.device)
         # past trial embedding
-        self.emb_pt = nn.Embedding(self.num_pt, self.hidden_size).to(self.device)
-        # positional embedding
         self.emb_p = nn.Embedding(self.max_seq_len, self.hidden_size).to(self.device)
 
         self.emb_dropout = nn.Dropout(self.dropout_p)
@@ -454,7 +451,7 @@ class MonaConvBert4ktPlusDiffPt(nn.Module):
         # |r| = (bs, n)
         # |mask| = (bs, n)
 
-        emb = self.emb_q(q) + self.emb_r(r) + self.emb_pid(pid) + self.emb_diff(diff) + self.emb_pt(pt) + self._positional_embedding(q) 
+        emb = self.emb_q(q) + self.emb_r(r) + self.emb_pid(pid) + self.emb_diff(diff) + self._positional_embedding(q) 
         # |emb| = (bs, n, emb_size)
 
         z = self.emb_dropout(emb)

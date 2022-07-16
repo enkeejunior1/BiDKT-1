@@ -49,9 +49,10 @@ class ASSIST2009_PID_DIFF_PT(Dataset):
         pid2idx = {pid: idx for idx, pid in enumerate(pid_list)} 
 
         # difficult
+
         diff = np.round(df.groupby('item_id')['correct'].mean() * 100)
-        diff_list = np.unique(df.groupby('item_id')['correct'].mean())
-        diff2idx = {d: idx for idx, d in enumerate(diff_list)}
+        diff_list = np.unique(diff)
+        #diff2idx = {d: idx for idx, d in enumerate(diff_list)}
 
         q_seqs = [] #로그 기준으로 각 user별 질문 목록을 담은 리스트
         r_seqs = [] #로그 기준으로 각 user별 정답 목록을 담은 리스트
@@ -59,7 +60,7 @@ class ASSIST2009_PID_DIFF_PT(Dataset):
         diff_seqs = []
         pt_seqs = []
 
-        for idx, u in enumerate(u_list):
+        for u in u_list:
             df_u = df[df["user_id"] == u]
 
             q_seq = np.array([q2idx[q] for q in df_u["skill_id"].values]) # 판다스로 짜는게 좋음
@@ -71,7 +72,7 @@ class ASSIST2009_PID_DIFF_PT(Dataset):
             r_seqs.append(r_seq)
             pid_seqs.append(pid_seq)
             diff_seqs.append(diff_seq)
-            pt_seqs.append(self._cumcount(pid_seq))
+            pt_seqs.append(self._cumcount(q_seq))
 
         return q_seqs, r_seqs, q_list, u_list, r_list, q2idx, u2idx, pid_seqs, diff_seqs, pt_seqs, pid_list, diff_list #끝에 두개 추가
 
