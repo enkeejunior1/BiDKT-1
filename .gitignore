@@ -6,3 +6,4 @@ src/test1.py
 src/nohup.out
 checkpoints/
 graphs/
+visual_records/
