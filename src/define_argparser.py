@@ -12,7 +12,7 @@ def define_argparser():
     p.add_argument('--train_ratio', type=float, default=.8)
     p.add_argument('--valid_ratio', type=float, default=.1)
     p.add_argument('--batch_size', type=int, default=64)
-    p.add_argument('--n_epochs', type=int, default=20)
+    p.add_argument('--n_epochs', type=int, default=50)
     p.add_argument('--verbose', type=int, default=2)
     p.add_argument('--learning_rate', type=int, default = 0.001)
 

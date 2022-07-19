@@ -1,5 +1,6 @@
 *.pt
 *.pth
+*.pyc
 model_records/
 score_records/
 datasets/

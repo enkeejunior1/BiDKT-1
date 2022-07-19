@@ -13,6 +13,7 @@ from trainers.monaconvbert4kt_plus_trainer import MonaConvBert4ktPlusTrainer
 from trainers.forgetting_monoconvbert4kt_plus_trainer import ForgettingMonoConvBert4ktPlusTrainer
 from trainers.monaconvbert4kt_plus_pt_trainer import MonaConvBert4ktPlusPastTrialTrainer
 from trainers.monaconvbert4kt_plus_diff_trainer import MonaConvBert4ktPlusDiffTrainer
+from trainers.monaconvbert4kt_plus_diff_para_trainer import MonaConvBert4ktPlusDiffParaTrainer
 from trainers.monaconvbert4kt_plus_diff_pt_trainer import MonaConvBert4ktPlusDiffPtTrainer
 
 def get_trainers(model, optimizer, device, num_q, crit, config):
@@ -188,6 +189,18 @@ def get_trainers(model, optimizer, device, num_q, crit, config):
         )
     elif config.model_name == "monaconvbert4kt_plus_diff":
         trainer = MonaConvBert4ktPlusDiffTrainer(
+            model=model,
+            optimizer=optimizer,
+            n_epochs=config.n_epochs,
+            device=device,
+            num_q=num_q,
+            crit=crit,
+            max_seq_len=config.max_seq_len,
+            grad_acc=config.grad_acc,
+            grad_acc_iter=config.grad_acc_iter
+        )
+    elif config.model_name == "monaconvbert4kt_plus_diff_para":
+        trainer = MonaConvBert4ktPlusDiffParaTrainer(
             model=model,
             optimizer=optimizer,
             n_epochs=config.n_epochs,
