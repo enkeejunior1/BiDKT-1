@@ -1,3 +1,5 @@
+*.pt
+*.pth
 model_records/
 score_records/
 datasets/
