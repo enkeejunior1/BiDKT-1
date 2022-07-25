@@ -318,7 +318,7 @@ class MonotonicConvolutionalMultiheadAttentionVis(nn.Module):
         return x.permute(0, 2, 1, 3)
         # |x| = (bs, n_attn_head, n, attn_head_size) = (64, 8, 100, 32)
 
-class EncoderBlockVis(nn.Module):
+class EncoderBlock(nn.Module):
 
     def __init__(
         self,
@@ -391,7 +391,7 @@ class MySequential(nn.Sequential):
 
         return x
 
-class MonaConvBert4ktPlusDiffVis(nn.Module):
+class MonaConvBert4ktPlusDiff(nn.Module):
 
     def __init__(
         self,
@@ -436,7 +436,7 @@ class MonaConvBert4ktPlusDiffVis(nn.Module):
 
         # Using MySequential
         self.encoder = MySequential(
-            *[EncoderBlockVis(
+            *[EncoderBlock(
                 hidden_size,
                 num_head,
                 self.use_leakyrelu,

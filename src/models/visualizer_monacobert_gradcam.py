@@ -423,6 +423,7 @@ class MonaConvBert4ktPlusDiffGradCAM(nn.Module):
         use_leakyrelu,
         dropout_p=.1,
     ):
+        super().__init__()
         self.num_q = num_q
         self.num_r = num_r + 2 # '+2' is for 1(correct), 0(incorrect), <PAD>, <MASK>
         self.num_pid = num_pid
@@ -437,8 +438,6 @@ class MonaConvBert4ktPlusDiffGradCAM(nn.Module):
         self.use_leakyrelu = use_leakyrelu
         self.dropout_p = dropout_p
 
-        super().__init__()
-
         # question embedding
         self.emb_q = nn.Embedding(self.num_q, self.hidden_size).to(self.device)
         self.emb_pid = nn.Embedding(self.num_pid, self.hidden_size).to(self.device)
@@ -448,6 +447,13 @@ class MonaConvBert4ktPlusDiffGradCAM(nn.Module):
         # positional embedding
         self.emb_p = nn.Embedding(self.max_seq_len, self.hidden_size).to(self.device)
         self.emb_dropout = nn.Dropout(self.dropout_p)
+
+        # CAM hook heler
+        self.emb_q_hook_helper    = HookHelper()
+        self.emb_pid_hook_helper  = HookHelper()
+        self.emb_diff_hook_helper = HookHelper()
+        self.emb_r_hook_helper    = HookHelper()
+        self.emb_p_hook_helper    = HookHelper()
 
         # Using MySequential
         self.encoder = MySequential(
@@ -486,7 +492,11 @@ class MonaConvBert4ktPlusDiffGradCAM(nn.Module):
         # |r| = (bs, n)
         # |mask| = (bs, n)
 
-        emb = self.emb_q(q) + self.emb_r(r) + self.emb_pid(pid) + self.emb_diff(diff) + self._positional_embedding(q)
+        emb = self.emb_q_hook_helper(self.emb_q(q)) + \
+        self.emb_pid_hook_helper(self.emb_r(r)) + \
+        self.emb_diff_hook_helper(self.emb_pid(pid)) + \
+        self.emb_r_hook_helper(self.emb_diff(diff)) + \
+        self.emb_p_hook_helper(self._positional_embedding(q))
         # |emb| = (bs, n, emb_size)
 
         z = self.emb_dropout(emb)
