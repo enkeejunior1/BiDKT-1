@@ -469,7 +469,7 @@ class MonaConvBert4ktPlusDiffGradCAM(nn.Module):
         self.generator = nn.Sequential(
             nn.LayerNorm(hidden_size), # Only for Pre-LN Transformer.
             nn.Linear(hidden_size, output_size),
-            nn.Sigmoid() # Binary
+            # nn.Sigmoid() # skip sigmoid for gradcam
         )
 
     # Learnable Positional embedding
