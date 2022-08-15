@@ -11,7 +11,8 @@ from define_argparser import define_argparser
 
 def main(config, train_loader=None, valid_loader=None, test_loader=None, num_q=None, num_r=None, num_pid=None, num_diff=None):
     # 0. device setting
-    device = torch.device('cpu') if config.gpu_id < 0 else torch.device('cuda:%d' % config.gpu_id)
+    # device = torch.device('cpu') if config.gpu_id < 0 else torch.device('cuda:%d' % config.gpu_id)
+    device = torch.device('cuda:1')
     
     # 1. get dataset from loader
     # 1-1. use fivefold
